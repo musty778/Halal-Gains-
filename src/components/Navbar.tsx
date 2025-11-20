@@ -111,8 +111,9 @@ const Navbar = () => {
     { path: '/', label: 'Home' },
     { path: '/coaches', label: 'Coaches' },
     { path: '/browse-coaches', label: 'Browse Coaches' },
-    { path: '/meal-plans', label: 'Meal Plans' },
+    { path: '/meal-plans-new', label: 'Meal Plans' },
     { path: '/workout-plans', label: 'Workout Plans' },
+    { path: '/progress', label: 'Progress' },
   ]
 
   return (

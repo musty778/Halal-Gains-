@@ -6,8 +6,11 @@ import BrowseCoaches from './pages/BrowseCoaches'
 import CoachProfile from './pages/CoachProfile'
 import Chat from './pages/Chat'
 import MealPlans from './pages/MealPlans'
+import MealPlansNew from './pages/MealPlansNew'
+import MealPlanDetail from './pages/MealPlanDetail'
 import WorkoutPlans from './pages/WorkoutPlans'
 import WorkoutPlanDetail from './pages/WorkoutPlanDetail'
+import Progress from './pages/Progress'
 import SignUp from './pages/SignUp'
 import Login from './pages/Login'
 
@@ -27,8 +30,11 @@ function App() {
               <Route path="/chat" element={<Chat />} />
               <Route path="/chat/:conversationId" element={<Chat />} />
               <Route path="/meal-plans" element={<MealPlans />} />
+              <Route path="/meal-plans-new" element={<MealPlansNew />} />
+              <Route path="/meal-plan/:id" element={<MealPlanDetail />} />
               <Route path="/workout-plans" element={<WorkoutPlans />} />
               <Route path="/workout-plan/:id" element={<WorkoutPlanDetail />} />
+              <Route path="/progress" element={<Progress />} />
             </Routes>
           </Layout>
         } />
