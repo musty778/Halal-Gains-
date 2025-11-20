@@ -457,7 +457,10 @@ const CoachProfile = () => {
                 <button className="w-full py-3 px-4 bg-primary-600 text-white rounded-lg font-semibold hover:bg-primary-700 transition-all">
                   Book Discovery Call
                 </button>
-                <button className="w-full py-3 px-4 bg-white border-2 border-primary-600 text-primary-600 rounded-lg font-semibold hover:bg-primary-50 transition-all">
+                <button
+                  onClick={() => navigate(`/chat?coach=${id}`)}
+                  className="w-full py-3 px-4 bg-white border-2 border-primary-600 text-primary-600 rounded-lg font-semibold hover:bg-primary-50 transition-all"
+                >
                   Message Coach
                 </button>
               </div>
@@ -493,6 +496,7 @@ const CoachProfile = () => {
           </div>
         </div>
       </div>
+
     </div>
   )
 }

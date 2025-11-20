@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Coaches from './pages/Coaches'
 import BrowseCoaches from './pages/BrowseCoaches'
 import CoachProfile from './pages/CoachProfile'
+import Chat from './pages/Chat'
 import MealPlans from './pages/MealPlans'
 import WorkoutPlans from './pages/WorkoutPlans'
 import SignUp from './pages/SignUp'
@@ -22,6 +23,8 @@ function App() {
               <Route path="/coaches" element={<Coaches />} />
               <Route path="/browse-coaches" element={<BrowseCoaches />} />
               <Route path="/coach/:id" element={<CoachProfile />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/chat/:conversationId" element={<Chat />} />
               <Route path="/meal-plans" element={<MealPlans />} />
               <Route path="/workout-plans" element={<WorkoutPlans />} />
             </Routes>
