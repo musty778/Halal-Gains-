@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 
@@ -43,9 +43,105 @@ const Chat = () => {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [otherUser, setOtherUser] = useState<UserInfo | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Filter conversations based on search query
+  const filteredConversations = conversations.filter(conv => {
+    if (!searchQuery.trim()) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      conv.other_user_name?.toLowerCase().includes(query) ||
+      conv.last_message?.toLowerCase().includes(query)
+    )
+  })
+
+  // Delete conversation handler (soft delete)
+  const handleDeleteConversation = async () => {
+    if (!selectedConversation || deleting || !currentUserId) return
+
+    setDeleting(true)
+    try {
+      // Get the conversation to determine user's role
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('client_id, coach_id')
+        .eq('id', selectedConversation)
+        .single()
+
+      if (!conv) throw new Error('Conversation not found')
+
+      // Check if current user is the coach in this conversation
+      const { data: myCoachProfile } = await supabase
+        .from('coach_profiles')
+        .select('id')
+        .eq('user_id', currentUserId)
+        .single()
+
+      const isCoachInConv = myCoachProfile && conv.coach_id === myCoachProfile.id
+
+      // Soft delete by setting the appropriate flag
+      const updateData = isCoachInConv
+        ? { deleted_by_coach: true }
+        : { deleted_by_client: true }
+
+      const { error } = await supabase
+        .from('conversations')
+        .update(updateData)
+        .eq('id', selectedConversation)
+
+      if (error) throw error
+
+      // Clear selection and refresh
+      setSelectedConversation(null)
+      setMessages([])
+      setOtherUser(null)
+      setShowDeleteConfirm(false)
+      navigate('/chat')
+      fetchConversations()
+    } catch (err) {
+      console.error('Error deleting conversation:', err)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  // Helper function to get user name from either client_profiles or coach_profiles
+  const getUserName = async (userId: string): Promise<{ name: string; photo?: string }> => {
+    // Try client_profiles first
+    const { data: clientData } = await supabase
+      .from('client_profiles')
+      .select('full_name, profile_photo')
+      .eq('user_id', userId)
+      .single()
+
+    if (clientData?.full_name) {
+      return {
+        name: clientData.full_name,
+        photo: clientData.profile_photo
+      }
+    }
+
+    // Try coach_profiles
+    const { data: coachData } = await supabase
+      .from('coach_profiles')
+      .select('full_name, profile_photos')
+      .eq('user_id', userId)
+      .single()
+
+    if (coachData?.full_name) {
+      return {
+        name: coachData.full_name,
+        photo: coachData.profile_photos?.[0]
+      }
+    }
+
+    return { name: 'Unknown User' }
+  }
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
@@ -87,17 +183,33 @@ const Chat = () => {
   useEffect(() => {
     const createConversationIfNeeded = async () => {
       const coachId = searchParams.get('coach')
-      if (!coachId || !currentUserId || userRole !== 'client') return
+      if (!coachId || !currentUserId) return
 
-      // Check if conversation already exists
+      // Check if conversation already exists (including soft-deleted ones)
       const { data: existingConv } = await supabase
         .from('conversations')
-        .select('id')
+        .select('id, deleted_by_client, deleted_by_coach')
         .eq('client_id', currentUserId)
         .eq('coach_id', coachId)
         .single()
 
       if (existingConv) {
+        // Reactivate the conversation for both parties if it was soft-deleted
+        const updates: Record<string, boolean> = {}
+        if (existingConv.deleted_by_client) {
+          updates.deleted_by_client = false
+        }
+        if (existingConv.deleted_by_coach) {
+          updates.deleted_by_coach = false
+        }
+
+        if (Object.keys(updates).length > 0) {
+          await supabase
+            .from('conversations')
+            .update(updates)
+            .eq('id', existingConv.id)
+        }
+
         setSelectedConversation(existingConv.id)
         navigate(`/chat/${existingConv.id}`, { replace: true })
       } else {
@@ -118,61 +230,78 @@ const Chat = () => {
       }
     }
 
-    if (currentUserId && userRole) {
+    if (currentUserId) {
       createConversationIfNeeded()
     }
-  }, [currentUserId, userRole, searchParams, navigate])
+  }, [currentUserId, searchParams, navigate])
 
-  // Fetch conversations
-  useEffect(() => {
-    const fetchConversations = async () => {
-      if (!currentUserId || !userRole) return
+  // Fetch conversations function (defined outside useEffect for reuse)
+  const fetchConversations = useCallback(async () => {
+    if (!currentUserId) return
 
-      const query = supabase
+      // Get user's coach profile ID if they have one
+      const { data: coachProfile } = await supabase
+        .from('coach_profiles')
+        .select('id')
+        .eq('user_id', currentUserId)
+        .single()
+
+      const coachProfileId = coachProfile?.id
+
+      // Fetch all conversations where user is either coach or client
+      let convData: any[] = []
+
+      // Get conversations where user is the client (exclude soft-deleted by client)
+      const { data: clientConvs } = await supabase
         .from('conversations')
         .select('*')
+        .eq('client_id', currentUserId)
+        .eq('deleted_by_client', false)
         .order('updated_at', { ascending: false })
 
-      // Filter based on role
-      if (userRole === 'coach') {
-        const { data: coachProfile } = await supabase
-          .from('coach_profiles')
-          .select('id')
-          .eq('user_id', currentUserId)
-          .single()
+      if (clientConvs) {
+        convData = [...clientConvs]
+      }
 
-        if (coachProfile) {
-          query.eq('coach_id', coachProfile.id)
+      // Get conversations where user is the coach (exclude soft-deleted by coach)
+      if (coachProfileId) {
+        const { data: coachConvs } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('coach_id', coachProfileId)
+          .eq('deleted_by_coach', false)
+          .order('updated_at', { ascending: false })
+
+        if (coachConvs) {
+          // Merge and deduplicate
+          const existingIds = new Set(convData.map(c => c.id))
+          coachConvs.forEach(c => {
+            if (!existingIds.has(c.id)) {
+              convData.push(c)
+            }
+          })
         }
-      } else {
-        query.eq('client_id', currentUserId)
       }
 
-      const { data: convData, error } = await query
-
-      if (error) {
-        console.error('Error fetching conversations:', error)
-        setLoading(false)
-        return
-      }
+      // Sort by updated_at
+      convData.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
 
       // Enrich conversations with user info and last message
       const enrichedConversations = await Promise.all(
-        (convData || []).map(async (conv) => {
+        convData.map(async (conv) => {
           let otherUserName = ''
           let otherUserPhoto = ''
 
-          if (userRole === 'coach') {
-            // Get client info
-            const { data: clientData } = await supabase
-              .from('client_profiles')
-              .select('full_name')
-              .eq('user_id', conv.client_id)
-              .single()
+          // Determine if current user is the coach or client in this conversation
+          const isCoachInConv = coachProfileId && conv.coach_id === coachProfileId
 
-            otherUserName = clientData?.full_name || 'Client'
+          if (isCoachInConv) {
+            // Current user is the coach, get client info
+            const userInfo = await getUserName(conv.client_id)
+            otherUserName = userInfo.name
+            otherUserPhoto = userInfo.photo || ''
           } else {
-            // Get coach info
+            // Current user is the client, get coach info
             const { data: coachData } = await supabase
               .from('coach_profiles')
               .select('full_name, profile_photos')
@@ -210,12 +339,51 @@ const Chat = () => {
         })
       )
 
-      setConversations(enrichedConversations)
-      setLoading(false)
-    }
+    setConversations(enrichedConversations)
+    setLoading(false)
+  }, [currentUserId])
 
+  // Initial fetch of conversations
+  useEffect(() => {
     fetchConversations()
-  }, [currentUserId, userRole])
+  }, [fetchConversations])
+
+  // Real-time subscription for conversation list updates
+  useEffect(() => {
+    if (!currentUserId) return
+
+    const channel = supabase
+      .channel('conversations-list')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          // Refresh conversations when any message changes
+          fetchConversations()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          // Refresh conversations when conversations change
+          fetchConversations()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [currentUserId, fetchConversations])
 
   // Fetch messages for selected conversation
   useEffect(() => {
@@ -240,18 +408,25 @@ const Chat = () => {
         .single()
 
       if (convData && currentUserId) {
-        if (userRole === 'coach') {
-          const { data: clientData } = await supabase
-            .from('client_profiles')
-            .select('full_name')
-            .eq('user_id', convData.client_id)
-            .single()
+        // Get user's coach profile to determine their role in this conversation
+        const { data: myCoachProfile } = await supabase
+          .from('coach_profiles')
+          .select('id')
+          .eq('user_id', currentUserId)
+          .single()
 
+        const isCoachInConv = myCoachProfile && convData.coach_id === myCoachProfile.id
+
+        if (isCoachInConv) {
+          // Current user is the coach in this conversation, get client info
+          const userInfo = await getUserName(convData.client_id)
           setOtherUser({
             id: convData.client_id,
-            name: clientData?.full_name || 'Client'
+            name: userInfo.name,
+            photo: userInfo.photo
           })
         } else {
+          // Current user is the client in this conversation, get coach info
           const { data: coachData } = await supabase
             .from('coach_profiles')
             .select('full_name, profile_photos')
@@ -288,21 +463,32 @@ const Chat = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${selectedConversation}`
+          table: 'messages'
         },
         (payload) => {
-          const newMsg = payload.new as Message
-          setMessages((prev) => [...prev, newMsg])
+          const message = payload.new as Message
 
-          // Mark as read if not from current user
-          if (newMsg.sender_id !== currentUserId) {
-            supabase
-              .from('messages')
-              .update({ is_read: true })
-              .eq('id', newMsg.id)
+          // Only process messages for this conversation
+          if (message.conversation_id !== selectedConversation) return
+
+          if (payload.eventType === 'INSERT') {
+            setMessages((prev) => [...prev, message])
+
+            // Mark as read if not from current user
+            if (message.sender_id !== currentUserId) {
+              supabase
+                .from('messages')
+                .update({ is_read: true })
+                .eq('id', message.id)
+            }
+          } else if (payload.eventType === 'UPDATE') {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === message.id ? message : msg
+              )
+            )
           }
         }
       )
@@ -331,10 +517,15 @@ const Chat = () => {
       setNewMessage('')
       inputRef.current?.focus()
 
-      // Update conversation timestamp
+      // Reactivate conversation for both parties and update timestamp
+      // This ensures the recipient sees the conversation even if they deleted it
       await supabase
         .from('conversations')
-        .update({ updated_at: new Date().toISOString() })
+        .update({
+          updated_at: new Date().toISOString(),
+          deleted_by_client: false,
+          deleted_by_coach: false
+        })
         .eq('id', selectedConversation)
     }
 
@@ -374,63 +565,106 @@ const Chat = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="grid grid-cols-1 md:grid-cols-3 h-[calc(100vh-200px)]">
             {/* Conversations List */}
-            <div className="border-r border-gray-200 overflow-y-auto">
-              {conversations.length === 0 ? (
-                <div className="p-6 text-center text-gray-500">
-                  <div className="text-4xl mb-2">💬</div>
-                  <p>No conversations yet</p>
-                  {userRole === 'client' && (
-                    <button
-                      onClick={() => navigate('/browse-coaches')}
-                      className="mt-3 text-primary-600 hover:text-primary-700 text-sm"
-                    >
-                      Find a coach to message
-                    </button>
-                  )}
-                </div>
-              ) : (
-                conversations.map((conv) => (
-                  <button
-                    key={conv.id}
-                    onClick={() => {
-                      setSelectedConversation(conv.id)
-                      navigate(`/chat/${conv.id}`)
-                    }}
-                    className={`w-full p-4 text-left border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                      selectedConversation === conv.id ? 'bg-primary-50' : ''
-                    }`}
+            <div className="border-r border-gray-200 flex flex-col">
+              {/* Search Input */}
+              <div className="p-3 border-b border-gray-200">
+                <div className="relative">
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                        {conv.other_user_photo ? (
-                          <img
-                            src={conv.other_user_photo}
-                            alt={conv.other_user_name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-gray-500">👤</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-gray-900 truncate">
-                            {conv.other_user_name}
-                          </span>
-                          {conv.unread_count && conv.unread_count > 0 ? (
-                            <span className="w-5 h-5 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center">
-                              {conv.unread_count}
-                            </span>
-                          ) : null}
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search conversations..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Conversations */}
+              <div className="flex-1 overflow-y-auto">
+                {conversations.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500">
+                    <div className="text-4xl mb-2">💬</div>
+                    <p>No conversations yet</p>
+                    {userRole === 'client' && (
+                      <button
+                        onClick={() => navigate('/browse-coaches')}
+                        className="mt-3 text-primary-600 hover:text-primary-700 text-sm"
+                      >
+                        Find a coach to message
+                      </button>
+                    )}
+                  </div>
+                ) : filteredConversations.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500">
+                    <p>No conversations found</p>
+                  </div>
+                ) : (
+                  filteredConversations.map((conv) => (
+                    <button
+                      key={conv.id}
+                      onClick={() => {
+                        setSelectedConversation(conv.id)
+                        navigate(`/chat/${conv.id}`)
+                      }}
+                      className={`w-full p-4 text-left border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+                        selectedConversation === conv.id ? 'bg-primary-50' : ''
+                      } ${conv.unread_count && conv.unread_count > 0 ? 'bg-blue-50/50' : ''}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                            {conv.other_user_photo ? (
+                              <img
+                                src={conv.other_user_photo}
+                                alt={conv.other_user_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-gray-500">👤</span>
+                            )}
+                          </div>
+                          {conv.unread_count && conv.unread_count > 0 && (
+                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary-500 rounded-full border-2 border-white"></span>
+                          )}
                         </div>
-                        {conv.last_message && (
-                          <p className="text-sm text-gray-500 truncate">{conv.last_message}</p>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className={`truncate ${
+                              conv.unread_count && conv.unread_count > 0
+                                ? 'font-bold text-gray-900'
+                                : 'font-medium text-gray-900'
+                            }`}>
+                              {conv.other_user_name}
+                            </span>
+                            {conv.unread_count && conv.unread_count > 0 ? (
+                              <span className="w-5 h-5 bg-primary-500 text-white text-xs rounded-full flex items-center justify-center">
+                                {conv.unread_count}
+                              </span>
+                            ) : null}
+                          </div>
+                          {conv.last_message && (
+                            <p className={`text-sm truncate ${
+                              conv.unread_count && conv.unread_count > 0
+                                ? 'font-semibold text-gray-700'
+                                : 'text-gray-500'
+                            }`}>
+                              {conv.last_message}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))
-              )}
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
 
             {/* Messages Area */}
@@ -438,21 +672,32 @@ const Chat = () => {
               {selectedConversation ? (
                 <>
                   {/* Chat Header */}
-                  <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                      {otherUser?.photo ? (
-                        <img
-                          src={otherUser.photo}
-                          alt={otherUser.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-gray-500">👤</span>
-                      )}
+                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                        {otherUser?.photo ? (
+                          <img
+                            src={otherUser.photo}
+                            alt={otherUser.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-gray-500">👤</span>
+                        )}
+                      </div>
+                      <div>
+                        <h2 className="font-semibold text-gray-900">{otherUser?.name}</h2>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="font-semibold text-gray-900">{otherUser?.name}</h2>
-                    </div>
+                    <button
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete conversation"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
                   </div>
 
                   {/* Messages */}
@@ -475,13 +720,33 @@ const Chat = () => {
                             }`}
                           >
                             <p className="break-words">{msg.content}</p>
-                            <p
-                              className={`text-xs mt-1 ${
+                            <div
+                              className={`flex items-center justify-end gap-2 mt-1 ${
                                 msg.sender_id === currentUserId ? 'text-primary-100' : 'text-gray-500'
                               }`}
                             >
-                              {formatTime(msg.created_at)}
-                            </p>
+                              <span className="text-xs">{formatTime(msg.created_at)}</span>
+                              {msg.sender_id === currentUserId && (
+                                <div className="flex flex-col items-center">
+                                  {msg.is_read ? (
+                                    <>
+                                      <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M18 7l-8 8-3-3" />
+                                        <path d="M22 7l-8 8-1-1" />
+                                      </svg>
+                                      <span className="text-[9px] text-white font-medium leading-tight">Read</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <svg className="w-3.5 h-3.5 text-primary-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M20 6L9 17l-5-5" />
+                                      </svg>
+                                      <span className="text-[9px] text-primary-200 font-medium leading-tight">Delivered</span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))
@@ -528,6 +793,45 @@ const Chat = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowDeleteConfirm(false)}
+          />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Conversation</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete this conversation? This action cannot be undone and all messages will be permanently deleted.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConversation}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

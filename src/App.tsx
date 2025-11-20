@@ -7,6 +7,7 @@ import CoachProfile from './pages/CoachProfile'
 import Chat from './pages/Chat'
 import MealPlans from './pages/MealPlans'
 import WorkoutPlans from './pages/WorkoutPlans'
+import WorkoutPlanDetail from './pages/WorkoutPlanDetail'
 import SignUp from './pages/SignUp'
 import Login from './pages/Login'
 
@@ -27,6 +28,7 @@ function App() {
               <Route path="/chat/:conversationId" element={<Chat />} />
               <Route path="/meal-plans" element={<MealPlans />} />
               <Route path="/workout-plans" element={<WorkoutPlans />} />
+              <Route path="/workout-plan/:id" element={<WorkoutPlanDetail />} />
             </Routes>
           </Layout>
         } />
