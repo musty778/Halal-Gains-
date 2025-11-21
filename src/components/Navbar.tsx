@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { User } from '@supabase/supabase-js'
+import { useRamadan } from '../contexts/RamadanContext'
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const navigate = useNavigate()
+  const { ramadanMode } = useRamadan()
 
   useEffect(() => {
     // Get initial session
@@ -117,11 +119,18 @@ const Navbar = () => {
   ]
 
   return (
-    <nav className="bg-primary-600 text-white shadow-lg">
+    <nav className={`text-white shadow-lg transition-colors duration-300 ${
+      ramadanMode
+        ? 'bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900'
+        : 'bg-primary-600'
+    }`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-4">
           {/* Logo */}
-          <Link to="/" className="text-2xl font-bold">
+          <Link to="/" className={`text-2xl font-bold transition-colors ${
+            ramadanMode ? 'text-yellow-400' : 'text-white'
+          }`}>
+            {ramadanMode && <span className="mr-2">🌙</span>}
             Halal Gains
           </Link>
 
@@ -131,7 +140,11 @@ const Navbar = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className="hover:text-primary-200 transition-colors"
+                className={`transition-colors ${
+                  ramadanMode
+                    ? 'hover:text-yellow-400'
+                    : 'hover:text-primary-200'
+                }`}
               >
                 {link.label}
               </Link>
@@ -140,7 +153,11 @@ const Navbar = () => {
               <>
                 <Link
                   to="/chat"
-                  className="relative hover:text-primary-200 transition-colors"
+                  className={`relative transition-colors ${
+                    ramadanMode
+                      ? 'hover:text-yellow-400'
+                      : 'hover:text-primary-200'
+                  }`}
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -153,7 +170,11 @@ const Navbar = () => {
                 </Link>
                 <button
                   onClick={handleSignOut}
-                  className="bg-primary-700 hover:bg-primary-800 px-4 py-2 rounded-lg transition-colors"
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    ramadanMode
+                      ? 'bg-yellow-500 text-gray-900 hover:bg-yellow-600'
+                      : 'bg-primary-700 hover:bg-primary-800'
+                  }`}
                 >
                   Sign Out
                 </button>
@@ -162,13 +183,21 @@ const Navbar = () => {
               <div className="flex items-center space-x-3">
                 <Link
                   to="/login"
-                  className="hover:text-primary-200 transition-colors"
+                  className={`transition-colors ${
+                    ramadanMode
+                      ? 'hover:text-yellow-400'
+                      : 'hover:text-primary-200'
+                  }`}
                 >
                   Login
                 </Link>
                 <Link
                   to="/signup"
-                  className="bg-white text-primary-600 hover:bg-primary-50 px-4 py-2 rounded-lg font-medium transition-colors"
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    ramadanMode
+                      ? 'bg-yellow-500 text-gray-900 hover:bg-yellow-600'
+                      : 'bg-white text-primary-600 hover:bg-primary-50'
+                  }`}
                 >
                   Sign Up
                 </Link>
@@ -207,18 +236,30 @@ const Navbar = () => {
               <Link
                 key={link.path}
                 to={link.path}
-                className="block py-2 hover:text-primary-200 transition-colors"
+                className={`block py-2 transition-colors ${
+                  ramadanMode
+                    ? 'hover:text-yellow-400'
+                    : 'hover:text-primary-200'
+                }`}
                 onClick={() => setIsMenuOpen(false)}
               >
                 {link.label}
               </Link>
             ))}
-            <div className="border-t border-primary-500 mt-3 pt-3">
+            <div className={`mt-3 pt-3 ${
+              ramadanMode
+                ? 'border-t border-yellow-500/30'
+                : 'border-t border-primary-500'
+            }`}>
               {user ? (
                 <>
                   <Link
                     to="/chat"
-                    className="flex items-center gap-2 py-2 hover:text-primary-200 transition-colors"
+                    className={`flex items-center gap-2 py-2 transition-colors ${
+                      ramadanMode
+                        ? 'hover:text-yellow-400'
+                        : 'hover:text-primary-200'
+                    }`}
                     onClick={() => setIsMenuOpen(false)}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,7 +277,11 @@ const Navbar = () => {
                       handleSignOut()
                       setIsMenuOpen(false)
                     }}
-                    className="block w-full text-left py-2 hover:text-primary-200 transition-colors"
+                    className={`block w-full text-left py-2 transition-colors ${
+                      ramadanMode
+                        ? 'hover:text-yellow-400'
+                        : 'hover:text-primary-200'
+                    }`}
                   >
                     Sign Out
                   </button>
@@ -245,14 +290,22 @@ const Navbar = () => {
                 <>
                   <Link
                     to="/login"
-                    className="block py-2 hover:text-primary-200 transition-colors"
+                    className={`block py-2 transition-colors ${
+                      ramadanMode
+                        ? 'hover:text-yellow-400'
+                        : 'hover:text-primary-200'
+                    }`}
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Login
                   </Link>
                   <Link
                     to="/signup"
-                    className="block py-2 hover:text-primary-200 transition-colors"
+                    className={`block py-2 transition-colors ${
+                      ramadanMode
+                        ? 'hover:text-yellow-400'
+                        : 'hover:text-primary-200'
+                    }`}
                     onClick={() => setIsMenuOpen(false)}
                   >
                     Sign Up

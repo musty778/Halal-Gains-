@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
+import { useRamadan } from '../contexts/RamadanContext'
 
 interface MealPlan {
   id: string
@@ -27,6 +28,7 @@ interface Client {
 
 const MealPlansNew = () => {
   const navigate = useNavigate()
+  const { ramadanMode: ramadanModeFilter, setRamadanMode: setRamadanModeFilter } = useRamadan()
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isCoach, setIsCoach] = useState(false)
   const [coachProfileId, setCoachProfileId] = useState<string | null>(null)
@@ -350,50 +352,92 @@ const MealPlansNew = () => {
     )
   }
 
+  // Filter meal plans based on Ramadan mode
+  const filteredMealPlans = ramadanModeFilter
+    ? mealPlans.filter(plan => plan.ramadan_mode === true)
+    : mealPlans
+
   // Coach view
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className={`min-h-screen transition-colors duration-300 ${ramadanModeFilter ? 'bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900' : 'bg-gray-50'}`}>
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">🍽️ Meal Plans</h1>
-          <button
-            onClick={openCreateModal}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Create Meal Plan
-          </button>
-        </div>
-
-        {mealPlans.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-            <div className="text-4xl mb-3">📋</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Meal Plans Yet</h3>
-            <p className="text-gray-600 mb-4">
-              Create your first meal plan and assign it to a client.
-            </p>
+          <h1 className={`text-2xl font-bold transition-colors ${ramadanModeFilter ? 'text-yellow-400' : 'text-gray-900'}`}>
+            {ramadanModeFilter ? '🌙 Ramadan Meal Plans' : '🍽️ Meal Plans'}
+          </h1>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => setRamadanModeFilter(!ramadanModeFilter)}
+              className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-all font-medium ${
+                ramadanModeFilter
+                  ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 text-gray-900 hover:from-yellow-600 hover:to-yellow-700 shadow-lg shadow-yellow-500/50'
+                  : 'bg-gray-800 text-white hover:bg-gray-700 border border-gray-700'
+              }`}
+            >
+              <span className="text-lg">🌙</span>
+              <span>{ramadanModeFilter ? 'Exit Ramadan Mode' : 'Ramadan Mode'}</span>
+            </button>
             <button
               onClick={openCreateModal}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+              className={`inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium ${
+                ramadanModeFilter
+                  ? 'bg-yellow-500 text-gray-900 hover:bg-yellow-600'
+                  : 'bg-primary-600 text-white hover:bg-primary-700'
+              }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Create Your First Meal Plan
+              Create Meal Plan
+            </button>
+          </div>
+        </div>
+
+        {filteredMealPlans.length === 0 ? (
+          <div className={`rounded-xl shadow-sm p-8 text-center transition-colors ${
+            ramadanModeFilter
+              ? 'bg-gray-800 border border-yellow-500/30'
+              : 'bg-white border border-gray-200'
+          }`}>
+            <div className="text-4xl mb-3">{ramadanModeFilter ? '🌙' : '📋'}</div>
+            <h3 className={`text-lg font-semibold mb-2 ${ramadanModeFilter ? 'text-yellow-400' : 'text-gray-900'}`}>
+              {ramadanModeFilter ? 'No Ramadan Meal Plans Yet' : 'No Meal Plans Yet'}
+            </h3>
+            <p className={`mb-4 ${ramadanModeFilter ? 'text-gray-300' : 'text-gray-600'}`}>
+              {ramadanModeFilter
+                ? 'Create your first Ramadan meal plan with Suhoor and Iftar meals.'
+                : 'Create your first meal plan and assign it to a client.'}
+            </p>
+            <button
+              onClick={openCreateModal}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors font-medium ${
+                ramadanModeFilter
+                  ? 'bg-yellow-500 text-gray-900 hover:bg-yellow-600'
+                  : 'bg-primary-600 text-white hover:bg-primary-700'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Create Your First {ramadanModeFilter ? 'Ramadan ' : ''}Meal Plan
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {mealPlans.map((plan) => (
+            {filteredMealPlans.map((plan) => (
               <div
                 key={plan.id}
                 onClick={() => navigate(`/meal-plan/${plan.id}`)}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
+                className={`rounded-xl shadow-sm p-5 hover:shadow-md transition-all cursor-pointer ${
+                  ramadanModeFilter
+                    ? 'bg-gray-800 border border-yellow-500/30 hover:border-yellow-500/50'
+                    : 'bg-white border border-gray-200'
+                }`}
               >
                 <div className="flex items-start justify-between mb-3">
-                  <h3 className="text-lg font-semibold text-gray-900 flex-1 pr-2">{plan.name}</h3>
+                  <h3 className={`text-lg font-semibold flex-1 pr-2 ${ramadanModeFilter ? 'text-yellow-400' : 'text-gray-900'}`}>
+                    {plan.name}
+                  </h3>
                   <div className="flex items-center gap-1">
                     {plan.ramadan_mode && (
                       <span className="text-xl" title="Ramadan Mode">🌙</span>
@@ -403,7 +447,11 @@ const MealPlansNew = () => {
                         e.stopPropagation()
                         openEditModal(plan)
                       }}
-                      className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        ramadanModeFilter
+                          ? 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10'
+                          : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'
+                      }`}
                       title="Edit plan"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -431,24 +479,30 @@ const MealPlansNew = () => {
                 </div>
 
                 {plan.description && (
-                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{plan.description}</p>
+                  <p className={`text-sm mb-3 line-clamp-2 ${ramadanModeFilter ? 'text-gray-300' : 'text-gray-600'}`}>
+                    {plan.description}
+                  </p>
                 )}
 
                 <div className="space-y-2 text-sm">
                   {plan.calories_target && (
-                    <div className="flex items-center gap-2 text-gray-600">
+                    <div className={`flex items-center gap-2 ${ramadanModeFilter ? 'text-gray-300' : 'text-gray-600'}`}>
                       <span>🔥</span>
                       <span>{plan.calories_target} calories/day</span>
                     </div>
                   )}
                   {(plan.protein_target_g || plan.carbs_target_g || plan.fats_target_g) && (
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+                    <div className={`flex flex-wrap items-center gap-3 text-xs ${ramadanModeFilter ? 'text-gray-300' : 'text-gray-600'}`}>
                       {plan.protein_target_g && <span>💪 {plan.protein_target_g}g P</span>}
                       {plan.carbs_target_g && <span>🍞 {plan.carbs_target_g}g C</span>}
                       {plan.fats_target_g && <span>🥑 {plan.fats_target_g}g F</span>}
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-gray-600 pt-2 border-t border-gray-100 mt-2">
+                  <div className={`flex items-center gap-2 pt-2 mt-2 ${
+                    ramadanModeFilter
+                      ? 'text-gray-300 border-t border-yellow-500/20'
+                      : 'text-gray-600 border-t border-gray-100'
+                  }`}>
                     {plan.client_id ? (
                       <>
                         <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -462,12 +516,16 @@ const MealPlansNew = () => {
                             <span className="text-xs">👤</span>
                           )}
                         </div>
-                        <span className="text-gray-900 truncate">{plan.client_name}</span>
+                        <span className={`truncate ${ramadanModeFilter ? 'text-yellow-400' : 'text-gray-900'}`}>
+                          {plan.client_name}
+                        </span>
                       </>
                     ) : (
                       <>
                         <span>👤</span>
-                        <span className="text-gray-400 italic">Not assigned</span>
+                        <span className={`italic ${ramadanModeFilter ? 'text-gray-500' : 'text-gray-400'}`}>
+                          Not assigned
+                        </span>
                       </>
                     )}
                   </div>
