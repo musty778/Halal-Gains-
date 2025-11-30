@@ -128,6 +128,7 @@ export interface ClientProfile {
   fitness_level: FitnessLevel
   fitness_goal: FitnessGoal
   post_pregnancy_recovery: boolean
+  coach_id?: string
   created_at: string
   updated_at: string
 }

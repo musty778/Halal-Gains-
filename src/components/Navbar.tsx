@@ -8,6 +8,7 @@ const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isCoach, setIsCoach] = useState(false)
   const navigate = useNavigate()
   const { ramadanMode } = useRamadan()
 
@@ -24,6 +25,26 @@ const Navbar = () => {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Check if user is a coach
+  useEffect(() => {
+    const checkIfCoach = async () => {
+      if (!user) {
+        setIsCoach(false)
+        return
+      }
+
+      const { data: coachProfile } = await supabase
+        .from('coach_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
+
+      setIsCoach(!!coachProfile)
+    }
+
+    checkIfCoach()
+  }, [user])
 
   // Fetch unread message count
   useEffect(() => {
@@ -109,14 +130,23 @@ const Navbar = () => {
     setIsMenuOpen(!isMenuOpen)
   }
 
-  const navLinks = [
+  // Filter nav links based on user role
+  const allNavLinks = [
     { path: '/', label: 'Home' },
-    { path: '/coaches', label: 'Coaches' },
-    { path: '/browse-coaches', label: 'Browse Coaches' },
+    { path: '/coaches', label: 'Coaches', clientOnly: true },
+    { path: '/browse-coaches', label: 'Browse Coaches', clientOnly: true },
     { path: '/meal-plans-new', label: 'Meal Plans' },
     { path: '/workout-plans', label: 'Workout Plans' },
     { path: '/progress', label: 'Progress' },
   ]
+
+  const navLinks = allNavLinks.filter(link => {
+    // If link is client-only and user is a coach, hide it
+    if (link.clientOnly && isCoach) {
+      return false
+    }
+    return true
+  })
 
   return (
     <nav className={`text-white shadow-lg transition-colors duration-300 ${

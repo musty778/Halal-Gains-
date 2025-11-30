@@ -50,6 +50,14 @@ interface WorkoutExercise {
   exercise_order: number
 }
 
+interface ExerciseCompletion {
+  id: string
+  exercise_id: string
+  client_user_id: string
+  completion_date: string
+  completed_at: string
+}
+
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const WorkoutPlanDetail = () => {
@@ -61,14 +69,20 @@ const WorkoutPlanDetail = () => {
   const [loading, setLoading] = useState(true)
   const [isCoach, setIsCoach] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [exerciseCompletions, setExerciseCompletions] = useState<Set<string>>(new Set())
+  const [togglingExercise, setTogglingExercise] = useState<string | null>(null)
 
   // Modal states
   const [showWeekModal, setShowWeekModal] = useState(false)
   const [showDayModal, setShowDayModal] = useState(false)
   const [showExerciseModal, setShowExerciseModal] = useState(false)
+  const [showWeightModal, setShowWeightModal] = useState(false)
   const [selectedWeek, setSelectedWeek] = useState<WorkoutWeek | null>(null)
   const [selectedDay, setSelectedDay] = useState<WorkoutDay | null>(null)
+  const [selectedWeekForWeight, setSelectedWeekForWeight] = useState<WorkoutWeek | null>(null)
   const [saving, setSaving] = useState(false)
+  const [currentWeight, setCurrentWeight] = useState<string>('')
+  const [submittingWeight, setSubmittingWeight] = useState(false)
 
   // Form states
   const [weekNumber, setWeekNumber] = useState(1)
@@ -105,6 +119,12 @@ const WorkoutPlanDetail = () => {
   useEffect(() => {
     fetchPlanDetails()
   }, [id])
+
+  useEffect(() => {
+    if (currentUserId && workoutPlan) {
+      fetchExerciseCompletions()
+    }
+  }, [currentUserId, isCoach, workoutPlan])
 
   const fetchPlanDetails = async () => {
     if (!id) return
@@ -181,6 +201,33 @@ const WorkoutPlanDetail = () => {
       )
 
       setWorkoutWeeks(weeksWithDays)
+    }
+  }
+
+  const fetchExerciseCompletions = async () => {
+    if (!currentUserId || !workoutPlan) return
+
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split('T')[0]
+
+    // Determine which user's completions to fetch
+    let targetUserId = currentUserId
+
+    // If coach is viewing and plan has a client_id, use it directly
+    // (client_id in workout_plans table is actually the user_id)
+    if (isCoach && workoutPlan.client_id) {
+      targetUserId = workoutPlan.client_id
+    }
+
+    const { data: completionsData } = await supabase
+      .from('workout_exercise_completions')
+      .select('exercise_id')
+      .eq('client_user_id', targetUserId)
+      .eq('completion_date', today)
+
+    if (completionsData) {
+      const completedIds = new Set(completionsData.map(c => c.exercise_id))
+      setExerciseCompletions(completedIds)
     }
   }
 
@@ -298,6 +345,87 @@ const WorkoutPlanDetail = () => {
     }
   }
 
+  const handleToggleExerciseCompletion = async (exerciseId: string) => {
+    if (!currentUserId || isCoach || togglingExercise) return
+
+    setTogglingExercise(exerciseId)
+
+    try {
+      const today = new Date().toISOString().split('T')[0]
+
+      const { data: result, error } = await supabase
+        .rpc('toggle_exercise_completion', {
+          p_exercise_id: exerciseId,
+          p_completion_date: today
+        })
+
+      if (error) {
+        console.error('Error toggling exercise completion:', error)
+        alert('Failed to update exercise completion. Please try again.')
+        return
+      }
+
+      if (result && result.success) {
+        // Update local state
+        setExerciseCompletions(prev => {
+          const newSet = new Set(prev)
+          if (result.completed) {
+            newSet.add(exerciseId)
+          } else {
+            newSet.delete(exerciseId)
+          }
+          return newSet
+        })
+      }
+    } finally {
+      setTogglingExercise(null)
+    }
+  }
+
+  const handleSubmitWeight = async () => {
+    if (!selectedWeekForWeight || !currentWeight || submittingWeight || !id) return
+
+    const weightValue = parseFloat(currentWeight)
+    if (isNaN(weightValue) || weightValue <= 0) {
+      alert('Please enter a valid weight')
+      return
+    }
+
+    setSubmittingWeight(true)
+
+    try {
+      const { data: result, error } = await supabase
+        .rpc('record_weekly_weight', {
+          p_workout_plan_id: id,
+          p_week_number: selectedWeekForWeight.week_number,
+          p_weight_kg: weightValue
+        })
+
+      if (error) {
+        console.error('Error recording weight:', error)
+        alert('Failed to record weight. Please try again.')
+        return
+      }
+
+      if (result && result.success) {
+        setShowWeightModal(false)
+        setCurrentWeight('')
+        setSelectedWeekForWeight(null)
+
+        // Show success message
+        if (result.weight_lost_kg !== null) {
+          const lostOrGained = result.weight_lost_kg >= 0 ? 'lost' : 'gained'
+          const amount = Math.abs(result.weight_lost_kg)
+          alert(`Great! You ${lostOrGained} ${amount.toFixed(1)} kg this week!`)
+        } else {
+          alert('Weight recorded successfully!')
+        }
+      }
+    } finally {
+      setSubmittingWeight(false)
+    }
+  }
+
   const resetDayForm = () => {
     setDayOfWeek(0)
     setWorkoutType('strength')
@@ -369,6 +497,35 @@ const WorkoutPlanDetail = () => {
       default:
         return { emoji: '📊', label: difficulty, color: 'text-gray-600 bg-gray-50' }
     }
+  }
+
+  const isDayCompleted = (day: WorkoutDay): boolean => {
+    if (day.workout_type === 'rest') return false
+    if (day.exercises.length === 0) return false
+
+    return day.exercises.every(exercise => exerciseCompletions.has(exercise.id))
+  }
+
+  const isWeekCompleted = (week: WorkoutWeek): boolean => {
+    if (week.days.length === 0) return false
+
+    for (const day of week.days) {
+      if (day.workout_type === 'rest') continue
+      if (day.exercises.length === 0) continue
+
+      const allDayExercisesCompleted = day.exercises.every(exercise =>
+        exerciseCompletions.has(exercise.id)
+      )
+
+      if (!allDayExercisesCompleted) return false
+    }
+
+    return true
+  }
+
+  const handleCompleteWeek = (week: WorkoutWeek) => {
+    setSelectedWeekForWeight(week)
+    setShowWeightModal(true)
   }
 
   if (loading) {
@@ -487,32 +644,47 @@ const WorkoutPlanDetail = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {workoutWeeks.map((week) => (
-                    <div key={week.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                      {/* Week Header */}
-                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                        <h3 className="font-semibold text-gray-900">Week {week.week_number}</h3>
-                        <div className="flex items-center gap-2">
-                          {isCoach && coachInfo?.user_id === currentUserId && (
-                            <>
+                  {workoutWeeks.map((week) => {
+                    const weekCompleted = isWeekCompleted(week)
+                    return (
+                      <div key={week.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                        {/* Week Header */}
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-semibold text-gray-900">Week {week.week_number}</h3>
+                            {!isCoach && weekCompleted && (
                               <button
-                                onClick={() => openAddDayModal(week)}
-                                className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                              >
-                                Add Day
-                              </button>
-                              <button
-                                onClick={() => handleDeleteWeek(week.id)}
-                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                onClick={() => handleCompleteWeek(week)}
+                                className="px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
+                                Complete Week
                               </button>
-                            </>
-                          )}
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isCoach && coachInfo?.user_id === currentUserId && (
+                              <>
+                                <button
+                                  onClick={() => openAddDayModal(week)}
+                                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                                >
+                                  Add Day
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteWeek(week.id)}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
                       {/* Days */}
                       {week.days.length === 0 ? (
@@ -523,15 +695,24 @@ const WorkoutPlanDetail = () => {
                         <div className="divide-y divide-gray-200">
                           {week.days.map((day) => {
                             const typeInfo = getWorkoutTypeInfo(day.workout_type)
+                            const dayCompleted = isDayCompleted(day)
                             return (
                               <div key={day.id} className="p-4">
                                 {/* Day Header */}
                                 <div className="flex items-start justify-between mb-3">
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center gap-3 flex-wrap">
                                     <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${typeInfo.color}`}>
                                       {typeInfo.emoji} {DAYS_OF_WEEK[day.day_of_week]}
                                     </span>
                                     <span className="text-sm text-gray-600">{typeInfo.label}</span>
+                                    {isCoach && dayCompleted && (
+                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                        </svg>
+                                        Completed
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="flex items-center gap-2">
                                     {isCoach && coachInfo?.user_id === currentUserId && (
@@ -571,38 +752,72 @@ const WorkoutPlanDetail = () => {
                                     {day.exercises.length === 0 ? (
                                       <p className="text-sm text-gray-500 italic">No exercises added</p>
                                     ) : (
-                                      day.exercises.map((exercise, idx) => (
-                                        <div key={exercise.id} className="bg-gray-50 rounded-lg p-3">
-                                          <div className="flex items-start justify-between">
-                                            <div className="flex-1">
-                                              <div className="flex items-center gap-2 mb-1">
-                                                <span className="font-medium text-gray-900">{idx + 1}.</span>
-                                                <span className="font-medium text-gray-900">{exercise.exercise_name}</span>
-                                              </div>
-                                              <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
-                                                {exercise.sets && <span>🔄 {exercise.sets} sets</span>}
-                                                {exercise.reps && <span>🔢 {exercise.reps} reps</span>}
-                                                {exercise.rest_period_seconds && (
-                                                  <span>⏱️ {exercise.rest_period_seconds}s rest</span>
+                                      day.exercises.map((exercise, idx) => {
+                                        const isCompleted = exerciseCompletions.has(exercise.id)
+                                        const isToggling = togglingExercise === exercise.id
+
+                                        return (
+                                          <div key={exercise.id} className={`bg-gray-50 rounded-lg p-3 transition-all ${isCompleted ? 'bg-green-50 border border-green-200' : ''}`}>
+                                            <div className="flex items-start justify-between gap-3">
+                                              {/* Checkbox for clients */}
+                                              {!isCoach && (
+                                                <button
+                                                  onClick={() => handleToggleExerciseCompletion(exercise.id)}
+                                                  disabled={isToggling}
+                                                  className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                                    isCompleted
+                                                      ? 'bg-green-500 border-green-500'
+                                                      : 'border-gray-300 hover:border-green-400'
+                                                  } ${isToggling ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                >
+                                                  {isCompleted && (
+                                                    <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                  )}
+                                                </button>
+                                              )}
+
+                                              <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                  <span className={`font-medium ${isCompleted ? 'text-green-700' : 'text-gray-900'}`}>
+                                                    {idx + 1}.
+                                                  </span>
+                                                  <span className={`font-medium ${isCompleted ? 'text-green-700 line-through' : 'text-gray-900'}`}>
+                                                    {exercise.exercise_name}
+                                                  </span>
+                                                  {isCompleted && (
+                                                    <span className="text-xs text-green-600 font-medium">✓ Done</span>
+                                                  )}
+                                                </div>
+                                                <div className={`flex flex-wrap items-center gap-3 text-sm ${isCompleted ? 'text-green-600' : 'text-gray-600'}`}>
+                                                  {exercise.sets && <span>🔄 {exercise.sets} sets</span>}
+                                                  {exercise.reps && <span>🔢 {exercise.reps} reps</span>}
+                                                  {exercise.rest_period_seconds && (
+                                                    <span>⏱️ {exercise.rest_period_seconds}s rest</span>
+                                                  )}
+                                                </div>
+                                                {exercise.notes && (
+                                                  <p className={`text-sm mt-1 ${isCompleted ? 'text-green-600' : 'text-gray-600'}`}>
+                                                    📝 {exercise.notes}
+                                                  </p>
                                                 )}
                                               </div>
-                                              {exercise.notes && (
-                                                <p className="text-sm text-gray-600 mt-1">📝 {exercise.notes}</p>
+
+                                              {isCoach && coachInfo?.user_id === currentUserId && (
+                                                <button
+                                                  onClick={() => handleDeleteExercise(exercise.id)}
+                                                  className="ml-2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                                                >
+                                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                  </svg>
+                                                </button>
                                               )}
                                             </div>
-                                            {isCoach && coachInfo?.user_id === currentUserId && (
-                                              <button
-                                                onClick={() => handleDeleteExercise(exercise.id)}
-                                                className="ml-2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                              >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                              </button>
-                                            )}
                                           </div>
-                                        </div>
-                                      ))
+                                        )
+                                      })
                                     )}
                                   </div>
                                 )}
@@ -612,7 +827,8 @@ const WorkoutPlanDetail = () => {
                         </div>
                       )}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -829,6 +1045,72 @@ const WorkoutPlanDetail = () => {
                     {saving ? 'Adding...' : 'Add Exercise'}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weight Tracking Modal */}
+      {showWeightModal && selectedWeekForWeight && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowWeightModal(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  Week {selectedWeekForWeight.week_number} Complete!
+                </h2>
+                <p className="text-gray-600">
+                  Congratulations on completing all exercises for this week!
+                </p>
+              </div>
+
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-semibold text-primary-900 mb-3">
+                  ⚖️ How much do you weigh now?
+                </h3>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    value={currentWeight}
+                    onChange={(e) => setCurrentWeight(e.target.value)}
+                    placeholder="Enter your weight"
+                    step="0.1"
+                    min="0"
+                    className="flex-1 px-4 py-3 border border-primary-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-lg"
+                    autoFocus
+                  />
+                  <span className="text-gray-600 font-medium">kg</span>
+                </div>
+                <p className="text-sm text-primary-700 mt-2">
+                  Track your progress to stay motivated!
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowWeightModal(false)
+                    setCurrentWeight('')
+                    setSelectedWeekForWeight(null)
+                  }}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={handleSubmitWeight}
+                  disabled={submittingWeight || !currentWeight}
+                  className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 font-medium"
+                >
+                  {submittingWeight ? 'Saving...' : 'Save Weight'}
+                </button>
               </div>
             </div>
           </div>

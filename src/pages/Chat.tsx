@@ -46,6 +46,10 @@ const Chat = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [isClientAssigned, setIsClientAssigned] = useState(false)
+  const [assigning, setAssigning] = useState(false)
+  const [currentClientUserId, setCurrentClientUserId] = useState<string | null>(null)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -59,6 +63,44 @@ const Chat = () => {
       conv.last_message?.toLowerCase().includes(query)
     )
   })
+
+  // Assign coach to client
+  const handleStartWorkingTogether = async () => {
+    if (!selectedConversation || !currentUserId || !currentClientUserId || assigning) return
+
+    setAssigning(true)
+    try {
+      // Call the secure RPC function to assign coach
+      const { data: result, error: rpcError } = await supabase
+        .rpc('assign_coach_to_client', {
+          p_coach_user_id: currentUserId,
+          p_client_user_id: currentClientUserId
+        })
+
+      if (rpcError) {
+        console.error('RPC Error:', rpcError)
+        throw new Error(rpcError.message || 'Failed to call assignment function')
+      }
+
+      // Check the result from the function
+      if (!result || !result.success) {
+        throw new Error(result?.error || 'Assignment failed')
+      }
+
+      // Update state immediately to show "Your Client" badge
+      setIsClientAssigned(true)
+      // Force a refresh to ensure UI updates
+      setRefreshTrigger(prev => prev + 1)
+
+      alert('Success! You are now working with this client. They can now see you in their Coaches menu.')
+    } catch (err: any) {
+      console.error('Error assigning coach:', err)
+      alert(`Failed to assign coach: ${err.message || 'Please try again.'}`)
+      setIsClientAssigned(false) // Reset on error
+    } finally {
+      setAssigning(false)
+    }
+  }
 
   // Delete conversation handler (soft delete)
   const handleDeleteConversation = async () => {
@@ -425,6 +467,22 @@ const Chat = () => {
             name: userInfo.name,
             photo: userInfo.photo
           })
+
+          // Store client user_id for assignment
+          setCurrentClientUserId(convData.client_id)
+
+          // Check if this client is already assigned to this coach
+          const { data: clientProfile } = await supabase
+            .from('client_profiles')
+            .select('coach_id')
+            .eq('user_id', convData.client_id)
+            .single()
+
+          if (clientProfile && clientProfile.coach_id === myCoachProfile?.id) {
+            setIsClientAssigned(true)
+          } else {
+            setIsClientAssigned(false)
+          }
         } else {
           // Current user is the client in this conversation, get coach info
           const { data: coachData } = await supabase
@@ -438,6 +496,10 @@ const Chat = () => {
             name: coachData?.full_name || 'Coach',
             photo: coachData?.profile_photos?.[0]
           })
+
+          // Reset client assignment state when user is a client
+          setCurrentClientUserId(null)
+          setIsClientAssigned(false)
         }
       }
 
@@ -452,7 +514,7 @@ const Chat = () => {
     }
 
     fetchMessages()
-  }, [selectedConversation, currentUserId, userRole])
+  }, [selectedConversation, currentUserId, userRole, refreshTrigger])
 
   // Real-time subscription for messages
   useEffect(() => {
@@ -687,17 +749,49 @@ const Chat = () => {
                       </div>
                       <div>
                         <h2 className="font-semibold text-gray-900">{otherUser?.name}</h2>
+                        {userRole === 'coach' && isClientAssigned && (
+                          <span className="text-xs text-primary-600 flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            Your Client
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete conversation"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {/* Start Working Together Button - Only for coaches */}
+                      {userRole === 'coach' && !isClientAssigned && (
+                        <button
+                          onClick={handleStartWorkingTogether}
+                          disabled={assigning}
+                          className="px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm font-medium flex items-center gap-1.5"
+                        >
+                          {assigning ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              <span>Starting...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                              </svg>
+                              <span>Start Working Together</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setShowDeleteConfirm(true)}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete conversation"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Messages */}

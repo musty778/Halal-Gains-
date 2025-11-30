@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run Database Migration</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .loading {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+        }
+        .success {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+        }
+        .error {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+        }
+        button {
+            background: #16a34a;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #15803d;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        pre {
+            background: #f9fafb;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Database Migration Runner</h1>
+        <p>This will add the <code>coach_id</code> column to your client_profiles table.</p>
+
+        <button id="runBtn" onclick="runMigration()">Run Migration</button>
+
+        <div id="status"></div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
+
+        const supabaseUrl = 'https://dukpetyemyhszdcnkmug.supabase.co'
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1a3BldHllbXloc3pkY25rbXVnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MzM3MDU0OSwiZXhwIjoyMDc4OTQ2NTQ5fQ._CV8ER3i64QB7jOHq11KW3Tv38Kfm78Py7np3Xc7ASE'
+
+        window.supabase = createClient(supabaseUrl, supabaseKey)
+
+        window.runMigration = async function() {
+            const statusDiv = document.getElementById('status')
+            const button = document.getElementById('runBtn')
+
+            button.disabled = true
+            statusDiv.innerHTML = '<div class="status loading">⏳ Running migration...</div>'
+
+            try {
+                // Step 1: Try to add the column using a workaround
+                // We'll create a simple table and then check if our main operation worked
+
+                const sql = `
+                    ALTER TABLE client_profiles
+                    ADD COLUMN IF NOT EXISTS coach_id UUID REFERENCES coach_profiles(id) ON DELETE SET NULL;
+
+                    CREATE INDEX IF NOT EXISTS idx_client_profiles_coach_id ON client_profiles(coach_id);
+
+                    UPDATE client_profiles
+                    SET coach_id = (SELECT id FROM coach_profiles ORDER BY created_at LIMIT 1)
+                    WHERE coach_id IS NULL;
+                `
+
+                // Try to execute via a stored procedure (if exists)
+                try {
+                    const { data, error } = await window.supabase.rpc('exec', { sql })
+                    if (error) throw error
+                } catch(e) {
+                    // If that doesn't work, show instructions
+                    statusDiv.innerHTML = `
+                        <div class="status error">
+                            <strong>⚠️ Automatic execution not available</strong>
+                            <p>Please run this SQL manually in Supabase:</p>
+                            <ol>
+                                <li>Go to <a href="https://supabase.com/dashboard/project/dukpetyemyhszdcnkmug/sql/new" target="_blank">Supabase SQL Editor</a></li>
+                                <li>Paste the SQL below and click "Run"</li>
+                            </ol>
+                            <pre>${sql}</pre>
+                        </div>
+                    `
+                    button.disabled = false
+                    return
+                }
+
+                // Verify it worked
+                const { data: testData, error: testError } = await window.supabase
+                    .from('client_profiles')
+                    .select('coach_id')
+                    .limit(1)
+
+                if (testError) {
+                    throw new Error('Column not created: ' + testError.message)
+                }
+
+                // Check assignments
+                const { data: clients } = await window.supabase
+                    .from('client_profiles')
+                    .select('full_name, coach_id')
+
+                let clientList = ''
+                if (clients) {
+                    clientList = '<ul>'
+                    clients.forEach(client => {
+                        clientList += `<li>${client.full_name}: ${client.coach_id ? '✅ Assigned' : '❌ Not assigned'}</li>`
+                    })
+                    clientList += '</ul>'
+                }
+
+                statusDiv.innerHTML = `
+                    <div class="status success">
+                        <strong>✅ Migration completed successfully!</strong>
+                        <p>The coach_id column has been added and coaches have been assigned.</p>
+                        ${clientList}
+                        <p><strong>Next step:</strong> Refresh your Halal Gains app to see your assigned coach!</p>
+                    </div>
+                `
+
+            } catch (error) {
+                statusDiv.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ Error:</strong>
+                        <p>${error.message}</p>
+                        <p>Please run the SQL manually in the Supabase dashboard.</p>
+                    </div>
+                `
+                button.disabled = false
+            }
+        }
+
+        // Auto-run on load
+        setTimeout(() => {
+            document.getElementById('runBtn').click()
+        }, 500)
+    </script>
+</body>
+</html>
