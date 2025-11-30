@@ -59,6 +59,17 @@ interface LogExerciseData {
   notes: string
 }
 
+interface WeightTracking {
+  id: string
+  client_user_id: string
+  workout_plan_id: string
+  week_number: number
+  weight_kg: number
+  weight_lost_kg: number | null
+  measurement_date: string
+  created_at: string
+}
+
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const Progress = () => {
@@ -75,6 +86,14 @@ const Progress = () => {
   const [dayNotes, setDayNotes] = useState('')
   const [dayRating, setDayRating] = useState<number>(0)
   const [saving, setSaving] = useState(false)
+  const [weightTracking, setWeightTracking] = useState<WeightTracking[]>([])
+  const [showAddWeightModal, setShowAddWeightModal] = useState(false)
+  const [manualWeight, setManualWeight] = useState('')
+  const [manualWeekNumber, setManualWeekNumber] = useState(1)
+  const [submittingWeight, setSubmittingWeight] = useState(false)
+  const [clients, setClients] = useState<any[]>([])
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
 
   const [exerciseData, setExerciseData] = useState<{ [key: string]: LogExerciseData }>({})
 
@@ -101,36 +120,79 @@ const Progress = () => {
   }, [navigate])
 
   useEffect(() => {
-    if (currentUserId) {
+    if (currentUserId && isCoach) {
+      fetchClients()
+    } else if (currentUserId && !isCoach) {
       fetchWorkoutPlans()
     }
-  }, [currentUserId])
+  }, [currentUserId, isCoach])
+
+  useEffect(() => {
+    if (isCoach && selectedClientId) {
+      fetchWorkoutPlans()
+    }
+  }, [selectedClientId])
 
   useEffect(() => {
     if (selectedPlanId) {
       fetchWorkoutWeeks()
+      fetchWeightTracking()
     }
   }, [selectedPlanId])
 
-  const fetchWorkoutPlans = async () => {
+  const fetchClients = async () => {
     if (!currentUserId) return
 
-    const { data, error } = await supabase
-      .from('workout_plans')
-      .select('id, name, goal, difficulty')
-      .eq('client_id', currentUserId)
-      .order('created_at', { ascending: false })
+    const { data: coachProfile } = await supabase
+      .from('coach_profiles')
+      .select('id')
+      .eq('user_id', currentUserId)
+      .single()
 
-    if (!error && data && data.length > 0) {
-      setWorkoutPlans(data)
-      setSelectedPlanId(data[0].id)
+    if (!coachProfile) return
+
+    const { data: clientsData, error } = await supabase
+      .from('client_profiles')
+      .select('id, user_id, full_name')
+      .eq('coach_id', coachProfile.id)
+      .order('full_name', { ascending: true })
+
+    if (!error && clientsData && clientsData.length > 0) {
+      setClients(clientsData)
+      setSelectedClientId(clientsData[0].user_id)
     }
 
     setLoading(false)
   }
 
+  const fetchWorkoutPlans = async () => {
+    const targetUserId = isCoach ? selectedClientId : currentUserId
+    if (!targetUserId) return
+
+    const { data, error } = await supabase
+      .from('workout_plans')
+      .select('id, name, goal, difficulty')
+      .eq('client_id', targetUserId)
+      .order('created_at', { ascending: false })
+
+    if (!error && data && data.length > 0) {
+      setWorkoutPlans(data)
+      setSelectedPlanId(data[0].id)
+    } else {
+      setWorkoutPlans([])
+      setSelectedPlanId(null)
+    }
+
+    if (!isCoach) {
+      setLoading(false)
+    }
+  }
+
   const fetchWorkoutWeeks = async () => {
     if (!selectedPlanId) return
+
+    const targetUserId = isCoach ? selectedClientId : currentUserId
+    if (!targetUserId) return
 
     const { data: weeksData } = await supabase
       .from('workout_weeks')
@@ -161,7 +223,7 @@ const Progress = () => {
                 .from('workout_day_completions')
                 .select('*')
                 .eq('workout_day_id', day.id)
-                .eq('user_id', currentUserId)
+                .eq('user_id', targetUserId)
                 .order('completed_at', { ascending: false })
                 .limit(1)
                 .single()
@@ -199,6 +261,79 @@ const Progress = () => {
     }
   }
 
+  const fetchWeightTracking = async () => {
+    if (!selectedPlanId) return
+
+    const targetUserId = isCoach ? selectedClientId : currentUserId
+    if (!targetUserId) return
+
+    console.log('Fetching weight tracking for:', { targetUserId, selectedPlanId, isCoach })
+
+    const { data, error } = await supabase
+      .from('client_weight_tracking')
+      .select('*')
+      .eq('client_user_id', targetUserId)
+      .eq('workout_plan_id', selectedPlanId)
+      .order('week_number', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching weight tracking:', error)
+    } else {
+      console.log('Weight tracking data:', data)
+      setWeightTracking(data || [])
+    }
+  }
+
+  const handleAddWeight = async () => {
+    if (!selectedPlanId || !manualWeight || submittingWeight) return
+
+    const weightValue = parseFloat(manualWeight)
+    if (isNaN(weightValue) || weightValue <= 0) {
+      alert('Please enter a valid weight')
+      return
+    }
+
+    setSubmittingWeight(true)
+
+    try {
+      const { data: result, error } = await supabase
+        .rpc('record_weekly_weight', {
+          p_workout_plan_id: selectedPlanId,
+          p_week_number: manualWeekNumber,
+          p_weight_kg: weightValue
+        })
+
+      if (error) {
+        console.error('Error recording weight:', error)
+        alert('Failed to record weight. Please try again.')
+        return
+      }
+
+      if (result && result.success) {
+        setShowAddWeightModal(false)
+        setManualWeight('')
+        setManualWeekNumber(manualWeekNumber + 1)
+
+        // Refresh weight data
+        await fetchWeightTracking()
+
+        // Show success message
+        if (result.weight_lost_kg !== null) {
+          const lostOrGained = result.weight_lost_kg >= 0 ? 'lost' : 'gained'
+          const amount = Math.abs(result.weight_lost_kg)
+          alert(`Great! You ${lostOrGained} ${amount.toFixed(1)} kg from last week!`)
+        } else {
+          alert('Weight recorded successfully!')
+        }
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Failed to record weight. Please try again.')
+    } finally {
+      setSubmittingWeight(false)
+    }
+  }
+
   const openLogModal = (week: WorkoutWeek, day: WorkoutDay) => {
     setSelectedWeek(week)
     setSelectedDay(day)
@@ -211,7 +346,7 @@ const Progress = () => {
       )
 
       initialData[exercise.id] = {
-        completed: existingCompletion?.completed || false,
+        completed: existingCompletion?.completed ?? true, // Default to checked
         actual_sets: existingCompletion?.actual_sets || exercise.sets || '',
         actual_reps: existingCompletion?.actual_reps || exercise.reps || '',
         weight_used_kg: existingCompletion?.weight_used_kg || '',
@@ -327,10 +462,44 @@ const Progress = () => {
   }
 
   const getCompletionPercentage = (day: WorkoutDay) => {
-    if (!day.completion || day.exercises.length === 0) return 0
+    // If no completion record, the day is not completed
+    if (!day.completion) return 0
+
+    // Rest days or days with no exercises are 100% complete if they have a completion record
+    if (day.exercises.length === 0 || day.workout_type === 'rest') return 100
 
     const completedCount = day.completion.exercise_completions.filter(ec => ec.completed).length
     return Math.round((completedCount / day.exercises.length) * 100)
+  }
+
+  const toggleWeekExpanded = (weekId: string) => {
+    setExpandedWeeks(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(weekId)) {
+        newSet.delete(weekId)
+      } else {
+        newSet.add(weekId)
+      }
+      return newSet
+    })
+  }
+
+  const getWeekCompletionSummary = (week: WorkoutWeek) => {
+    const totalDays = week.days.length
+    const completedDays = week.days.filter(day => {
+      const percentage = getCompletionPercentage(day)
+      console.log(`Week ${week.week_number}, Day ${day.day_of_week}:`, {
+        workout_type: day.workout_type,
+        has_completion: !!day.completion,
+        exercises_count: day.exercises.length,
+        exercise_completions: day.completion?.exercise_completions.length || 0,
+        completed_exercises: day.completion?.exercise_completions.filter(ec => ec.completed).length || 0,
+        percentage: percentage
+      })
+      return percentage === 100
+    }).length
+    console.log(`Week ${week.week_number} Summary: ${completedDays}/${totalDays} days completed`)
+    return { totalDays, completedDays }
   }
 
   if (loading) {
@@ -341,16 +510,18 @@ const Progress = () => {
     )
   }
 
-  if (isCoach) {
+  // Removed old coach view - now coaches see full progress view below
+
+  if (isCoach && clients.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">📊 Progress Tracking</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">📊 Client Progress</h1>
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-            <div className="text-4xl mb-3">👨‍🏫</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Coach View Coming Soon</h3>
+            <div className="text-4xl mb-3">👥</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">No Clients Yet</h3>
             <p className="text-gray-600">
-              Client progress tracking view for coaches is under development.
+              You don't have any assigned clients yet.
             </p>
           </div>
         </div>
@@ -358,7 +529,7 @@ const Progress = () => {
     )
   }
 
-  if (workoutPlans.length === 0) {
+  if (!isCoach && workoutPlans.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-6">
@@ -386,7 +557,29 @@ const Progress = () => {
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">📊 My Progress</h1>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-4">
+            {isCoach ? '📊 Client Progress' : '📊 My Progress'}
+          </h1>
+
+          {/* Client Selector for Coaches */}
+          {isCoach && clients.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Client
+              </label>
+              <select
+                value={selectedClientId || ''}
+                onChange={(e) => setSelectedClientId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                {clients.map(client => (
+                  <option key={client.user_id} value={client.user_id}>
+                    {client.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Plan Selector */}
           {workoutPlans.length > 1 && (
@@ -409,6 +602,146 @@ const Progress = () => {
           )}
         </div>
 
+        {/* Weight Tracking Section */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">⚖️ Weight Progress</h2>
+            {!isCoach && (
+              <button
+                onClick={() => setShowAddWeightModal(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+              >
+                ➕ Add Weight
+              </button>
+            )}
+          </div>
+
+          {weightTracking.length === 0 ? (
+            <div className="text-center py-8">
+              <div className="text-4xl mb-3">⚖️</div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">No Weight Data Yet</h3>
+              <p className="text-gray-600 mb-4">
+                Click "Add Weight" above to start tracking your progress!
+              </p>
+            </div>
+          ) : (
+            <>
+            {/* Weight Stats Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="text-sm text-blue-700 font-medium mb-1">Current Weight</div>
+                <div className="text-2xl font-bold text-blue-900">
+                  {weightTracking[weightTracking.length - 1].weight_kg} kg
+                </div>
+                <div className="text-xs text-blue-600 mt-1">
+                  Week {weightTracking[weightTracking.length - 1].week_number}
+                </div>
+              </div>
+
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="text-sm text-green-700 font-medium mb-1">Starting Weight</div>
+                <div className="text-2xl font-bold text-green-900">
+                  {weightTracking[0].weight_kg} kg
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  Week {weightTracking[0].week_number}
+                </div>
+              </div>
+
+              <div className={`${
+                weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                  ? 'bg-purple-50 border-purple-200'
+                  : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                  ? 'bg-orange-50 border-orange-200'
+                  : 'bg-gray-50 border-gray-200'
+              } border rounded-lg p-4`}>
+                <div className={`text-sm font-medium mb-1 ${
+                  weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                    ? 'text-purple-700'
+                    : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                    ? 'text-orange-700'
+                    : 'text-gray-700'
+                }`}>
+                  Total Change
+                </div>
+                <div className={`text-2xl font-bold ${
+                  weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                    ? 'text-purple-900'
+                    : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                    ? 'text-orange-900'
+                    : 'text-gray-900'
+                }`}>
+                  {weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0 ? '-' : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0 ? '+' : ''}
+                  {Math.abs(weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg).toFixed(1)} kg
+                </div>
+                <div className={`text-xs mt-1 ${
+                  weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                    ? 'text-purple-600'
+                    : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                    ? 'text-orange-600'
+                    : 'text-gray-600'
+                }`}>
+                  {weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                    ? '📉 Lost'
+                    : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                    ? '📈 Gained'
+                    : 'No change'}
+                </div>
+              </div>
+            </div>
+
+            {/* Weight History Timeline */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Weekly History</h3>
+              {weightTracking.slice().reverse().map((weight) => (
+                <div
+                  key={weight.id}
+                  className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                >
+                  <div className="flex-shrink-0 w-16 text-center">
+                    <div className="text-xs text-gray-500 font-medium">Week</div>
+                    <div className="text-lg font-bold text-gray-900">{weight.week_number}</div>
+                  </div>
+
+                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div>
+                      <div className="text-xs text-gray-500">Weight</div>
+                      <div className="text-base font-semibold text-gray-900">{weight.weight_kg} kg</div>
+                    </div>
+
+                    {weight.weight_lost_kg !== null && (
+                      <div>
+                        <div className="text-xs text-gray-500">Change</div>
+                        <div className={`text-base font-semibold ${
+                          weight.weight_lost_kg > 0
+                            ? 'text-green-600'
+                            : weight.weight_lost_kg < 0
+                            ? 'text-red-600'
+                            : 'text-gray-600'
+                        }`}>
+                          {weight.weight_lost_kg > 0 ? '-' : weight.weight_lost_kg < 0 ? '+' : ''}
+                          {Math.abs(weight.weight_lost_kg).toFixed(1)} kg
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="hidden sm:block">
+                      <div className="text-xs text-gray-500">Date</div>
+                      <div className="text-base text-gray-700">
+                        {new Date(weight.measurement_date).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric'
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            </>
+          )}
+        </div>
+
         {/* Weeks */}
         {workoutWeeks.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
@@ -420,17 +753,48 @@ const Progress = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {workoutWeeks.map(week => (
-              <div key={week.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                {/* Week Header */}
-                <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-4 md:px-6 py-4">
-                  <h2 className="text-xl font-bold text-white">
-                    📅 Week {week.week_number}
-                  </h2>
-                </div>
+            {workoutWeeks.map(week => {
+              const isExpanded = expandedWeeks.has(week.id)
+              const { totalDays, completedDays } = getWeekCompletionSummary(week)
+              const weekCompletion = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0
 
-                {/* Days */}
-                <div className="p-4 md:p-6 space-y-4">
+              return (
+                <div key={week.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  {/* Week Header - Clickable */}
+                  <button
+                    onClick={() => toggleWeekExpanded(week.id)}
+                    className="w-full bg-gradient-to-r from-primary-500 to-primary-600 px-4 md:px-6 py-4 hover:from-primary-600 hover:to-primary-700 transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-bold text-white">
+                          📅 Week {week.week_number}
+                        </h2>
+                        <span className="text-sm text-white/90 bg-white/20 px-3 py-1 rounded-full">
+                          {completedDays}/{totalDays} days
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {/* Completion Progress */}
+                        <div className="hidden sm:flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full">
+                          <span className="text-sm text-white font-medium">{weekCompletion}%</span>
+                        </div>
+                        {/* Dropdown Arrow */}
+                        <svg
+                          className={`w-6 h-6 text-white transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Days - Collapsible */}
+                  {isExpanded && (
+                    <div className="p-4 md:p-6 space-y-4">
                   {week.days.map(day => {
                     const typeInfo = getWorkoutTypeInfo(day.workout_type)
                     const completionPercentage = getCompletionPercentage(day)
@@ -454,12 +818,14 @@ const Progress = () => {
                                 </span>
                               )}
                             </div>
-                            <button
-                              onClick={() => openLogModal(week, day)}
-                              className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
-                            >
-                              {day.completion ? '✏️ Update Log' : '➕ Log Workout'}
-                            </button>
+                            {!isCoach && (
+                              <button
+                                onClick={() => openLogModal(week, day)}
+                                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                              >
+                                {day.completion ? '✏️ Update Log' : '➕ Log Workout'}
+                              </button>
+                            )}
                           </div>
 
                           {/* Prayer Time Notes */}
@@ -562,9 +928,11 @@ const Progress = () => {
                       </div>
                     )
                   })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -752,6 +1120,86 @@ const Progress = () => {
                     </>
                   )}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Weight Modal */}
+      {showAddWeightModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">⚖️ Add Weight Entry</h2>
+                <button
+                  onClick={() => setShowAddWeightModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Week Number
+                  </label>
+                  <input
+                    type="number"
+                    value={manualWeekNumber}
+                    onChange={(e) => setManualWeekNumber(parseInt(e.target.value) || 1)}
+                    min="1"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Enter the week number for this weight measurement
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Your Weight (kg)
+                  </label>
+                  <input
+                    type="number"
+                    value={manualWeight}
+                    onChange={(e) => setManualWeight(e.target.value)}
+                    placeholder="Enter your weight"
+                    step="0.1"
+                    min="0"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowAddWeightModal(false)}
+                    disabled={submittingWeight}
+                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddWeight}
+                    disabled={submittingWeight || !manualWeight}
+                    className="flex-1 px-4 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {submittingWeight ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        ✅ Save Weight
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

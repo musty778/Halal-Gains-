@@ -32,6 +32,15 @@ interface MealPlanDay {
   day_name: string | null
   notes: string | null
   meals: MealPlanMeal[]
+  completion?: MealPlanDayCompletion
+}
+
+interface MealPlanDayCompletion {
+  id: string
+  meal_plan_day_id: string
+  user_id: string
+  completed_at: string
+  notes: string | null
 }
 
 interface MealPlanMeal {
@@ -84,6 +93,7 @@ const MealPlanDetail = () => {
   const [isCoach, setIsCoach] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [expandedDayId, setExpandedDayId] = useState<string | null>(null)
+  const [expandedWeekNumber, setExpandedWeekNumber] = useState<number | null>(null)
 
   // Modal states
   const [showDayModal, setShowDayModal] = useState(false)
@@ -95,6 +105,10 @@ const MealPlanDetail = () => {
   const [selectedMeal, setSelectedMeal] = useState<MealPlanMeal | null>(null)
   const [selectedFood, setSelectedFood] = useState<MealPlanFood | null>(null)
   const [saving, setSaving] = useState(false)
+  const [showWeightModal, setShowWeightModal] = useState(false)
+  const [selectedWeekForWeight, setSelectedWeekForWeight] = useState<{ weekNumber: number, days: MealPlanDay[] } | null>(null)
+  const [currentWeight, setCurrentWeight] = useState<string>('')
+  const [submittingWeight, setSubmittingWeight] = useState(false)
 
   // Form states
   const [dayNumber, setDayNumber] = useState(1)
@@ -138,8 +152,10 @@ const MealPlanDetail = () => {
   }, [navigate])
 
   useEffect(() => {
-    fetchPlanDetails()
-  }, [id])
+    if (currentUserId) {
+      fetchPlanDetails()
+    }
+  }, [id, currentUserId])
 
   const fetchPlanDetails = async () => {
     if (!id) return
@@ -176,7 +192,7 @@ const MealPlanDetail = () => {
   }
 
   const fetchMealPlanDays = async () => {
-    if (!id) return
+    if (!id || !currentUserId) return
 
     const { data: daysData } = await supabase
       .from('meal_plan_days')
@@ -208,14 +224,29 @@ const MealPlanDetail = () => {
             })
           )
 
+          // Get completion data for this day
+          const { data: completionData } = await supabase
+            .from('meal_plan_day_completions')
+            .select('*')
+            .eq('meal_plan_day_id', day.id)
+            .eq('user_id', currentUserId)
+            .single()
+
           return {
             ...day,
-            meals: mealsWithFoods
+            meals: mealsWithFoods,
+            completion: completionData || undefined
           }
         })
       )
 
       setMealPlanDays(daysWithMeals)
+
+      // Expand first week by default if not already expanded
+      if (daysWithMeals.length > 0 && expandedWeekNumber === null) {
+        const firstWeekNumber = Math.ceil(daysWithMeals[0].day_number / 7)
+        setExpandedWeekNumber(firstWeekNumber)
+      }
 
       // Expand first day by default if not already expanded
       if (daysWithMeals.length > 0 && !expandedDayId) {
@@ -510,6 +541,70 @@ const MealPlanDetail = () => {
     }, { calories: 0, protein: 0, carbs: 0, fats: 0 })
   }
 
+  const groupDaysByWeek = (days: MealPlanDay[]) => {
+    const weeks: { [key: number]: MealPlanDay[] } = {}
+    days.forEach(day => {
+      const weekNumber = Math.ceil(day.day_number / 7)
+      if (!weeks[weekNumber]) {
+        weeks[weekNumber] = []
+      }
+      weeks[weekNumber].push(day)
+    })
+    return weeks
+  }
+
+  const isWeekCompleted = (weekDays: MealPlanDay[]): boolean => {
+    if (weekDays.length === 0) return false
+    return weekDays.every(day => day.completion !== undefined)
+  }
+
+  const handleCompleteWeek = async (weekDays: MealPlanDay[]) => {
+    if (!currentUserId) return
+
+    // Mark all days in the week as completed
+    const incompleteDays = weekDays.filter(day => !day.completion)
+
+    for (const day of incompleteDays) {
+      await supabase
+        .from('meal_plan_day_completions')
+        .insert({
+          meal_plan_day_id: day.id,
+          user_id: currentUserId
+        })
+    }
+
+    await fetchMealPlanDays()
+    alert('Week completed! Great job staying on track with your meal plan!')
+  }
+
+  const handleToggleDayCompletion = async (day: MealPlanDay) => {
+    if (!currentUserId) return
+
+    if (day.completion) {
+      // Remove completion
+      const { error } = await supabase
+        .from('meal_plan_day_completions')
+        .delete()
+        .eq('id', day.completion.id)
+
+      if (!error) {
+        await fetchMealPlanDays()
+      }
+    } else {
+      // Add completion
+      const { error } = await supabase
+        .from('meal_plan_day_completions')
+        .insert({
+          meal_plan_day_id: day.id,
+          user_id: currentUserId
+        })
+
+      if (!error) {
+        await fetchMealPlanDays()
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -525,6 +620,9 @@ const MealPlanDetail = () => {
   const availableMealTypes = mealPlan.ramadan_mode
     ? MEAL_TYPES
     : MEAL_TYPES.filter(mt => !mt.ramadan)
+
+  const weekGroups = groupDaysByWeek(mealPlanDays)
+  const weekNumbers = Object.keys(weekGroups).map(Number).sort((a, b) => a - b)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -611,10 +709,10 @@ const MealPlanDetail = () => {
             )}
           </div>
 
-          {/* Daily Breakdown Section */}
+          {/* Weekly Breakdown Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">📅 Daily Breakdown</h2>
+              <h2 className="text-xl font-bold text-gray-900">📅 Weekly Breakdown</h2>
               {isCoach && coachInfo?.user_id === currentUserId && (
                 <button
                   onClick={openAddDayModal}
@@ -641,136 +739,118 @@ const MealPlanDetail = () => {
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {mealPlanDays.map((day) => {
-                    const dayTotals = calculateDayTotals(day.meals)
-                    const isExpanded = expandedDayId === day.id
-                    const hasMultipleDays = mealPlanDays.length > 1
+                  {weekNumbers.map((weekNumber) => {
+                    const weekDays = weekGroups[weekNumber]
+                    const weekCompleted = isWeekCompleted(weekDays)
+                    const isWeekExpanded = expandedWeekNumber === weekNumber
+                    const hasMultipleWeeks = weekNumbers.length > 1
 
                     return (
-                      <div key={day.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                        {/* Day Header */}
-                        <div
-                          className={`bg-gray-50 px-4 py-3 ${!isExpanded && hasMultipleDays ? 'cursor-pointer hover:bg-gray-100' : ''} ${isExpanded || !hasMultipleDays ? 'border-b border-gray-200' : ''}`}
-                          onClick={() => hasMultipleDays && setExpandedDayId(isExpanded ? null : day.id)}
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <div className="flex items-center gap-3 flex-1">
-                              {hasMultipleDays && (
+                      <div key={weekNumber} className="border border-gray-200 rounded-lg overflow-hidden">
+                        {/* Week Header */}
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {hasMultipleWeeks && (
+                              <button
+                                onClick={() => setExpandedWeekNumber(isWeekExpanded ? null : weekNumber)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                              >
                                 <svg
-                                  className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                                  className={`w-5 h-5 transition-transform ${isWeekExpanded ? 'rotate-90' : ''}`}
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
                                 >
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
-                              )}
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-gray-900">
-                                  Day {day.day_number}
-                                  {day.day_name && ` - ${day.day_name}`}
-                                </h3>
-                                {day.meals.length > 0 && (
-                                  <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 mt-1">
-                                    <span>🔥 {dayTotals.calories} cal</span>
-                                    <span>💪 {dayTotals.protein.toFixed(1)}g</span>
-                                    <span>🍞 {dayTotals.carbs.toFixed(1)}g</span>
-                                    <span>🥑 {dayTotals.fats.toFixed(1)}g</span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            {isCoach && coachInfo?.user_id === currentUserId && (
-                              <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => openAddMealModal(day)}
-                                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                                >
-                                  Add Meal
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteDay(day.id)}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
-                              </div>
+                              </button>
+                            )}
+                            <h3 className="font-semibold text-gray-900">Week {weekNumber}</h3>
+                            {!isCoach && weekCompleted && (
+                              <button
+                                onClick={() => handleCompleteWeek(weekDays)}
+                                className="px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Complete Week
+                              </button>
                             )}
                           </div>
-                          {day.notes && (
-                            <p className="text-sm text-gray-600 mt-2">📝 {day.notes}</p>
-                          )}
                         </div>
 
-                        {/* Meals */}
-                        {(isExpanded || !hasMultipleDays) && (
-                          day.meals.length === 0 ? (
-                            <div className="p-4 text-center text-gray-500 text-sm">
-                              No meals added yet
-                            </div>
-                          ) : (
-                            <div className="divide-y divide-gray-200">
-                              {day.meals.map((meal) => {
-                                const mealTypeInfo = getMealTypeInfo(meal.meal_type)
-                                const mealTotals = calculateMealTotals(meal.foods)
+                        {/* Days in Week */}
+                        {(isWeekExpanded || !hasMultipleWeeks) && (
+                          <div className="divide-y divide-gray-200">
+                            {weekDays.map((day) => {
+                              const dayTotals = calculateDayTotals(day.meals)
+                              const isExpanded = expandedDayId === day.id
+                              const hasMultipleDaysInWeek = weekDays.length > 1
 
-                                return (
-                                  <div key={meal.id} className="p-4">
-                                    {/* Meal Header */}
-                                    <div className="flex items-start justify-between mb-3">
-                                      <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-1">
-                                          <span className="text-xl">{mealTypeInfo.emoji}</span>
-                                          <h4 className="font-semibold text-gray-900">
-                                            {meal.meal_name || mealTypeInfo.label}
-                                          </h4>
-                                          {meal.meal_time && (
-                                            <span className="text-sm text-gray-500">⏰ {meal.meal_time}</span>
+                              return (
+                                <div key={day.id} className={day.completion ? 'bg-green-50/30' : ''}>
+                                  {/* Day Header */}
+                                  <div
+                                    className={`px-4 py-3 ${!isExpanded && hasMultipleDaysInWeek ? 'cursor-pointer hover:bg-gray-50' : ''} ${isExpanded || !hasMultipleDaysInWeek ? 'border-b border-gray-200' : ''}`}
+                                    onClick={() => hasMultipleDaysInWeek && setExpandedDayId(isExpanded ? null : day.id)}
+                                  >
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                      <div className="flex items-center gap-3 flex-1">
+                                        {/* Completion Checkbox - Only show for clients */}
+                                        {!isCoach && (
+                                          <div onClick={(e) => e.stopPropagation()}>
+                                            <input
+                                              type="checkbox"
+                                              checked={!!day.completion}
+                                              onChange={() => handleToggleDayCompletion(day)}
+                                              className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
+                                            />
+                                          </div>
+                                        )}
+                                        {hasMultipleDaysInWeek && (
+                                          <svg
+                                            className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                                            fill="none"
+                                            stroke="currentColor"
+                                            viewBox="0 0 24 24"
+                                          >
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                          </svg>
+                                        )}
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2">
+                                            <h3 className="font-semibold text-gray-900">
+                                              Day {day.day_number}
+                                              {day.day_name && ` - ${day.day_name}`}
+                                            </h3>
+                                            {day.completion && (
+                                              <span className="inline-flex items-center gap-1 text-green-600 text-sm font-medium">
+                                                ✓ Completed
+                                              </span>
+                                            )}
+                                          </div>
+                                          {day.meals.length > 0 && (
+                                            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 mt-1">
+                                              <span>🔥 {dayTotals.calories} cal</span>
+                                              <span>💪 {dayTotals.protein.toFixed(1)}g</span>
+                                              <span>🍞 {dayTotals.carbs.toFixed(1)}g</span>
+                                              <span>🥑 {dayTotals.fats.toFixed(1)}g</span>
+                                            </div>
                                           )}
                                         </div>
-                                        {meal.description && (
-                                          <p className="text-sm text-gray-600 mb-1">{meal.description}</p>
-                                        )}
-                                        {meal.total_calories && (
-                                          <div className="flex items-center gap-2 text-sm text-gray-700 mb-1">
-                                            <span className="font-medium">🔥 {meal.total_calories} cal</span>
-                                          </div>
-                                        )}
-                                        {meal.foods.length > 0 && (
-                                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                                            <span>🔥 {mealTotals.calories} cal (from ingredients)</span>
-                                            <span>💪 {mealTotals.protein.toFixed(1)}g</span>
-                                            <span>🍞 {mealTotals.carbs.toFixed(1)}g</span>
-                                            <span>🥑 {mealTotals.fats.toFixed(1)}g</span>
-                                          </div>
-                                        )}
-                                        {meal.notes && (
-                                          <p className="text-sm text-gray-600 mt-1">💡 {meal.notes}</p>
-                                        )}
                                       </div>
                                       {isCoach && coachInfo?.user_id === currentUserId && (
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                                           <button
-                                            onClick={() => openAddFoodModal(meal)}
-                                            className="px-3 py-1 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                                            onClick={() => openAddMealModal(day)}
+                                            className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                                           >
-                                            Add Food
+                                            Add Meal
                                           </button>
                                           <button
-                                            onClick={() => openEditMealModal(meal)}
-                                            className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
-                                            title="Edit meal"
-                                          >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                            </svg>
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteMeal(meal.id)}
-                                            className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                            title="Delete meal"
+                                            onClick={() => handleDeleteDay(day.id)}
+                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                           >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -779,67 +859,152 @@ const MealPlanDetail = () => {
                                         </div>
                                       )}
                                     </div>
+                                    {day.notes && (
+                                      <p className="text-sm text-gray-600 mt-2">📝 {day.notes}</p>
+                                    )}
+                                  </div>
 
-                                    {/* Foods */}
-                                    {meal.foods.length === 0 ? (
-                                      <p className="text-sm text-gray-500 italic ml-7">No foods added</p>
+                                  {/* Meals */}
+                                  {(isExpanded || !hasMultipleDaysInWeek) && (
+                                    day.meals.length === 0 ? (
+                                      <div className="p-4 text-center text-gray-500 text-sm">
+                                        No meals added yet
+                                      </div>
                                     ) : (
-                                      <div className="space-y-2 ml-7">
-                                        {meal.foods.map((food, idx) => (
-                                          <div key={food.id} className="bg-gray-50 rounded-lg p-3">
-                                            <div className="flex items-start justify-between">
-                                              <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                  <span className="font-medium text-gray-900">
-                                                    {idx + 1}. {food.food_name}
-                                                  </span>
-                                                  {food.is_halal && <span className="text-sm">✅</span>}
-                                                </div>
-                                                <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-                                                  {food.quantity && food.serving_size && (
-                                                    <span>📏 {food.quantity} {food.serving_size}</span>
+                                      <div className="divide-y divide-gray-200">
+                                        {day.meals.map((meal) => {
+                                          const mealTypeInfo = getMealTypeInfo(meal.meal_type)
+                                          const mealTotals = calculateMealTotals(meal.foods)
+
+                                          return (
+                                            <div key={meal.id} className="p-4">
+                                              {/* Meal Header */}
+                                              <div className="flex items-start justify-between mb-3">
+                                                <div className="flex-1">
+                                                  <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-xl">{mealTypeInfo.emoji}</span>
+                                                    <h4 className="font-semibold text-gray-900">
+                                                      {meal.meal_name || mealTypeInfo.label}
+                                                    </h4>
+                                                    {meal.meal_time && (
+                                                      <span className="text-sm text-gray-500">⏰ {meal.meal_time}</span>
+                                                    )}
+                                                  </div>
+                                                  {meal.description && (
+                                                    <p className="text-sm text-gray-600 mb-1">{meal.description}</p>
                                                   )}
-                                                  {food.calories && <span>🔥 {food.calories} cal</span>}
-                                                  {food.protein_g && <span>💪 {food.protein_g}g P</span>}
-                                                  {food.carbs_g && <span>🍞 {food.carbs_g}g C</span>}
-                                                  {food.fats_g && <span>🥑 {food.fats_g}g F</span>}
+                                                  {meal.total_calories && (
+                                                    <div className="flex items-center gap-2 text-sm text-gray-700 mb-1">
+                                                      <span className="font-medium">🔥 {meal.total_calories} cal</span>
+                                                    </div>
+                                                  )}
+                                                  {meal.foods.length > 0 && (
+                                                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                                                      <span>🔥 {mealTotals.calories} cal (from ingredients)</span>
+                                                      <span>💪 {mealTotals.protein.toFixed(1)}g</span>
+                                                      <span>🍞 {mealTotals.carbs.toFixed(1)}g</span>
+                                                      <span>🥑 {mealTotals.fats.toFixed(1)}g</span>
+                                                    </div>
+                                                  )}
+                                                  {meal.notes && (
+                                                    <p className="text-sm text-gray-600 mt-1">💡 {meal.notes}</p>
+                                                  )}
                                                 </div>
-                                                {food.notes && (
-                                                  <p className="text-xs text-gray-600 mt-1">📝 {food.notes}</p>
+                                                {isCoach && coachInfo?.user_id === currentUserId && (
+                                                  <div className="flex items-center gap-2">
+                                                    <button
+                                                      onClick={() => openAddFoodModal(meal)}
+                                                      className="px-3 py-1 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                                                    >
+                                                      Add Food
+                                                    </button>
+                                                    <button
+                                                      onClick={() => openEditMealModal(meal)}
+                                                      className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                                                      title="Edit meal"
+                                                    >
+                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                      </svg>
+                                                    </button>
+                                                    <button
+                                                      onClick={() => handleDeleteMeal(meal.id)}
+                                                      className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                      title="Delete meal"
+                                                    >
+                                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                      </svg>
+                                                    </button>
+                                                  </div>
                                                 )}
                                               </div>
-                                              {isCoach && coachInfo?.user_id === currentUserId && (
-                                                <div className="flex items-center gap-1 ml-2">
-                                                  <button
-                                                    onClick={() => openEditFoodModal(food)}
-                                                    className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
-                                                    title="Edit ingredient"
-                                                  >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                                    </svg>
-                                                  </button>
-                                                  <button
-                                                    onClick={() => handleDeleteFood(food.id)}
-                                                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                                                    title="Delete ingredient"
-                                                  >
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                    </svg>
-                                                  </button>
+
+                                              {/* Foods */}
+                                              {meal.foods.length === 0 ? (
+                                                <p className="text-sm text-gray-500 italic ml-7">No foods added</p>
+                                              ) : (
+                                                <div className="space-y-2 ml-7">
+                                                  {meal.foods.map((food, idx) => (
+                                                    <div key={food.id} className="bg-gray-50 rounded-lg p-3">
+                                                      <div className="flex items-start justify-between">
+                                                        <div className="flex-1">
+                                                          <div className="flex items-center gap-2 mb-1">
+                                                            <span className="font-medium text-gray-900">
+                                                              {idx + 1}. {food.food_name}
+                                                            </span>
+                                                            {food.is_halal && <span className="text-sm">✅</span>}
+                                                          </div>
+                                                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+                                                            {food.quantity && food.serving_size && (
+                                                              <span>📏 {food.quantity} {food.serving_size}</span>
+                                                            )}
+                                                            {food.calories && <span>🔥 {food.calories} cal</span>}
+                                                            {food.protein_g && <span>💪 {food.protein_g}g P</span>}
+                                                            {food.carbs_g && <span>🍞 {food.carbs_g}g C</span>}
+                                                            {food.fats_g && <span>🥑 {food.fats_g}g F</span>}
+                                                          </div>
+                                                          {food.notes && (
+                                                            <p className="text-xs text-gray-600 mt-1">📝 {food.notes}</p>
+                                                          )}
+                                                        </div>
+                                                        {isCoach && coachInfo?.user_id === currentUserId && (
+                                                          <div className="flex items-center gap-1 ml-2">
+                                                            <button
+                                                              onClick={() => openEditFoodModal(food)}
+                                                              className="p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded transition-colors"
+                                                              title="Edit ingredient"
+                                                            >
+                                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                                              </svg>
+                                                            </button>
+                                                            <button
+                                                              onClick={() => handleDeleteFood(food.id)}
+                                                              className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                                              title="Delete ingredient"
+                                                            >
+                                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                              </svg>
+                                                            </button>
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    </div>
+                                                  ))}
                                                 </div>
                                               )}
                                             </div>
-                                          </div>
-                                        ))}
+                                          )
+                                        })}
                                       </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )
+                                    )
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
                         )}
                       </div>
                     )

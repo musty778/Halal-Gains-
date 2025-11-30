@@ -50,14 +50,6 @@ interface WorkoutExercise {
   exercise_order: number
 }
 
-interface ExerciseCompletion {
-  id: string
-  exercise_id: string
-  client_user_id: string
-  completion_date: string
-  completed_at: string
-}
-
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const WorkoutPlanDetail = () => {
