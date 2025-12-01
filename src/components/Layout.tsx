@@ -1,5 +1,5 @@
 import { ReactNode } from 'react'
-import Navbar from './Navbar'
+import Sidebar from './Sidebar'
 
 interface LayoutProps {
   children: ReactNode
@@ -7,16 +7,14 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-1 w-full">
-        {children}
-      </main>
-      <footer className="bg-gray-800 text-white py-6 mt-auto">
-        <div className="container mx-auto px-4 text-center">
-          <p>&copy; 2024 Halal Gains. All rights reserved.</p>
-        </div>
-      </footer>
+    <div className="min-h-screen bg-gray-50">
+      <Sidebar />
+      {/* Main content area with left margin for sidebar on desktop, top padding for mobile header */}
+      <div className="lg:ml-64 pt-16 lg:pt-0">
+        <main className="min-h-screen">
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

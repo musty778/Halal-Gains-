@@ -43,6 +43,15 @@ interface MealPlanDayCompletion {
   notes: string | null
 }
 
+interface MealPlanWeekCompletion {
+  id: string
+  meal_plan_id: string
+  user_id: string
+  week_number: number
+  completed_at: string
+  weight_kg: number | null
+}
+
 interface MealPlanMeal {
   id: string
   meal_plan_day_id: string
@@ -89,6 +98,7 @@ const MealPlanDetail = () => {
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null)
   const [coachInfo, setCoachInfo] = useState<CoachInfo | null>(null)
   const [mealPlanDays, setMealPlanDays] = useState<MealPlanDay[]>([])
+  const [weekCompletions, setWeekCompletions] = useState<MealPlanWeekCompletion[]>([])
   const [loading, setLoading] = useState(true)
   const [isCoach, setIsCoach] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -154,6 +164,7 @@ const MealPlanDetail = () => {
   useEffect(() => {
     if (currentUserId) {
       fetchPlanDetails()
+      fetchWeekCompletions()
     }
   }, [id, currentUserId])
 
@@ -553,15 +564,33 @@ const MealPlanDetail = () => {
     return weeks
   }
 
+  const fetchWeekCompletions = async () => {
+    if (!id || !currentUserId) return
+
+    const { data } = await supabase
+      .from('meal_plan_week_completions')
+      .select('*')
+      .eq('meal_plan_id', id)
+      .eq('user_id', currentUserId)
+
+    if (data) {
+      setWeekCompletions(data)
+    }
+  }
+
   const isWeekCompleted = (weekDays: MealPlanDay[]): boolean => {
     if (weekDays.length === 0) return false
     return weekDays.every(day => day.completion !== undefined)
   }
 
-  const handleCompleteWeek = async (weekDays: MealPlanDay[]) => {
+  const getWeekCompletion = (weekNumber: number): MealPlanWeekCompletion | undefined => {
+    return weekCompletions.find(wc => wc.week_number === weekNumber)
+  }
+
+  const handleCompleteWeek = async (weekNumber: number, weekDays: MealPlanDay[]) => {
     if (!currentUserId) return
 
-    // Mark all days in the week as completed
+    // Mark all days in the week as completed first
     const incompleteDays = weekDays.filter(day => !day.completion)
 
     for (const day of incompleteDays) {
@@ -574,7 +603,58 @@ const MealPlanDetail = () => {
     }
 
     await fetchMealPlanDays()
-    alert('Week completed! Great job staying on track with your meal plan!')
+
+    // Open weight modal
+    setSelectedWeekForWeight({ weekNumber, days: weekDays })
+    setShowWeightModal(true)
+  }
+
+  const handleSubmitWeight = async () => {
+    if (!selectedWeekForWeight || !currentUserId || !id || !currentWeight) return
+
+    setSubmittingWeight(true)
+
+    try {
+      // Call the database function to record weight
+      const { data, error } = await supabase.rpc('record_meal_plan_weekly_weight', {
+        p_meal_plan_id: id,
+        p_week_number: selectedWeekForWeight.weekNumber,
+        p_weight_kg: parseFloat(currentWeight)
+      })
+
+      if (error) {
+        alert('Error recording weight: ' + error.message)
+        setSubmittingWeight(false)
+        return
+      }
+
+      // Mark the week as completed
+      const { error: weekError } = await supabase
+        .from('meal_plan_week_completions')
+        .insert({
+          meal_plan_id: id,
+          user_id: currentUserId,
+          week_number: selectedWeekForWeight.weekNumber,
+          weight_kg: parseFloat(currentWeight)
+        })
+
+      if (weekError) {
+        alert('Error marking week as completed: ' + weekError.message)
+        setSubmittingWeight(false)
+        return
+      }
+
+      // Refresh data
+      await fetchWeekCompletions()
+      setShowWeightModal(false)
+      setCurrentWeight('')
+      setSelectedWeekForWeight(null)
+      alert('Week completed! Great job staying on track with your meal plan!')
+    } catch (error) {
+      alert('An error occurred. Please try again.')
+    } finally {
+      setSubmittingWeight(false)
+    }
   }
 
   const handleToggleDayCompletion = async (day: MealPlanDay) => {
@@ -766,15 +846,26 @@ const MealPlanDetail = () => {
                               </button>
                             )}
                             <h3 className="font-semibold text-gray-900">Week {weekNumber}</h3>
-                            {!isCoach && weekCompleted && (
+                            {!isCoach && weekCompleted && !getWeekCompletion(weekNumber) && (
                               <button
-                                onClick={() => handleCompleteWeek(weekDays)}
+                                onClick={() => handleCompleteWeek(weekNumber, weekDays)}
                                 className="px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Complete Week
+                              </button>
+                            )}
+                            {!isCoach && getWeekCompletion(weekNumber) && (
+                              <button
+                                disabled
+                                className="px-4 py-1.5 bg-gray-400 text-white text-sm font-medium rounded-lg cursor-not-allowed flex items-center gap-2"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Completed
                               </button>
                             )}
                           </div>
@@ -1580,6 +1671,58 @@ const MealPlanDetail = () => {
                     className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
                   >
                     {saving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weight Entry Modal */}
+      {showWeightModal && selectedWeekForWeight && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !submittingWeight && setShowWeightModal(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">⚖️ Record Your Weight</h2>
+              <p className="text-gray-600 mb-4">
+                Congratulations on completing Week {selectedWeekForWeight.weekNumber}! Please enter your current weight to track your progress.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Current Weight (kg)
+                  </label>
+                  <input
+                    type="number"
+                    value={currentWeight}
+                    onChange={(e) => setCurrentWeight(e.target.value)}
+                    placeholder="e.g., 75.5"
+                    min="0"
+                    step="0.1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowWeightModal(false)
+                      setCurrentWeight('')
+                      setSelectedWeekForWeight(null)
+                    }}
+                    disabled={submittingWeight}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmitWeight}
+                    disabled={submittingWeight || !currentWeight}
+                    className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  >
+                    {submittingWeight ? 'Submitting...' : 'Submit Weight'}
                   </button>
                 </div>
               </div>

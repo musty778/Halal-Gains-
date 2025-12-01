@@ -1,6 +1,30 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js'
+import { Line } from 'react-chartjs-2'
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
 
 interface WorkoutPlan {
   id: string
@@ -62,7 +86,8 @@ interface LogExerciseData {
 interface WeightTracking {
   id: string
   client_user_id: string
-  workout_plan_id: string
+  workout_plan_id: string | null
+  meal_plan_id: string | null
   week_number: number
   weight_kg: number
   weight_lost_kg: number | null
@@ -136,9 +161,14 @@ const Progress = () => {
   useEffect(() => {
     if (selectedPlanId) {
       fetchWorkoutWeeks()
-      fetchWeightTracking()
     }
   }, [selectedPlanId])
+
+  useEffect(() => {
+    if (currentUserId || (isCoach && selectedClientId)) {
+      fetchWeightTracking()
+    }
+  }, [currentUserId, selectedClientId, isCoach])
 
   const fetchClients = async () => {
     if (!currentUserId) return
@@ -262,22 +292,21 @@ const Progress = () => {
   }
 
   const fetchWeightTracking = async () => {
-    if (!selectedPlanId) return
-
     const targetUserId = isCoach ? selectedClientId : currentUserId
     if (!targetUserId) return
 
-    console.log('Fetching weight tracking for:', { targetUserId, selectedPlanId, isCoach })
+    console.log('Fetching weight tracking for:', { targetUserId, isCoach })
 
+    // Fetch ALL weight tracking data for this user (from both workout and meal plans)
     const { data, error } = await supabase
       .from('client_weight_tracking')
       .select('*')
       .eq('client_user_id', targetUserId)
-      .eq('workout_plan_id', selectedPlanId)
-      .order('week_number', { ascending: true })
+      .order('measurement_date', { ascending: true })
 
     if (error) {
       console.error('Error fetching weight tracking:', error)
+      setWeightTracking([])
     } else {
       console.log('Weight tracking data:', data)
       setWeightTracking(data || [])
@@ -502,6 +531,146 @@ const Progress = () => {
     return { totalDays, completedDays }
   }
 
+  const getWeekWeights = (weekNumber: number) => {
+    return weightTracking.filter(w => w.week_number === weekNumber)
+  }
+
+  const getChartData = () => {
+    if (weightTracking.length === 0) return null
+
+    // Sort by date to ensure chronological order
+    const sortedWeights = [...weightTracking].sort((a, b) =>
+      new Date(a.measurement_date).getTime() - new Date(b.measurement_date).getTime()
+    )
+
+    const labels = sortedWeights.map((weight) => {
+      const date = new Date(weight.measurement_date)
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    })
+
+    const weights = sortedWeights.map(w => w.weight_kg)
+
+    // Calculate min and max for better Y-axis scaling
+    const minWeight = Math.min(...weights)
+    const maxWeight = Math.max(...weights)
+    const padding = (maxWeight - minWeight) * 0.1 || 5 // 10% padding or 5kg minimum
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Weight (kg)',
+          data: weights,
+          fill: true,
+          backgroundColor: (context: any) => {
+            const ctx = context.chart.ctx
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400)
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.2)')
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)')
+            return gradient
+          },
+          borderColor: 'rgb(99, 102, 241)',
+          borderWidth: 3,
+          pointBackgroundColor: sortedWeights.map(w =>
+            w.workout_plan_id ? 'rgb(168, 85, 247)' : 'rgb(34, 197, 94)'
+          ),
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          tension: 0.4,
+        }
+      ]
+    }
+  }
+
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        padding: 12,
+        borderColor: 'rgba(99, 102, 241, 0.5)',
+        borderWidth: 1,
+        titleFont: {
+          size: 14,
+          weight: 'bold' as const
+        },
+        bodyFont: {
+          size: 13
+        },
+        callbacks: {
+          label: function(context: any) {
+            const weight = weightTracking.find(w =>
+              new Date(w.measurement_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) === context.label
+            )
+
+            const lines = [`Weight: ${context.parsed.y} kg`]
+
+            if (weight?.weight_lost_kg !== null && weight?.weight_lost_kg !== undefined) {
+              const change = weight.weight_lost_kg
+              const prefix = change > 0 ? '-' : change < 0 ? '+' : ''
+              lines.push(`Change: ${prefix}${Math.abs(change).toFixed(1)} kg`)
+            }
+
+            lines.push(`Week ${weight?.week_number || ''}`)
+            lines.push(weight?.workout_plan_id ? '🏋️ Workout' : '🍽️ Meal Plan')
+
+            return lines
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: false,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)',
+          drawBorder: false
+        },
+        ticks: {
+          font: {
+            size: 12,
+            weight: '500' as const
+          },
+          color: '#6B7280',
+          callback: function(value: any) {
+            return value + ' kg'
+          }
+        }
+      },
+      x: {
+        grid: {
+          display: false,
+          drawBorder: false
+        },
+        ticks: {
+          font: {
+            size: 11,
+            weight: '500' as const
+          },
+          color: '#6B7280',
+          maxRotation: 45,
+          minRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 8
+        }
+      }
+    },
+    animation: {
+      duration: 1500,
+      easing: 'easeInOutQuart' as const
+    },
+    interaction: {
+      intersect: false,
+      mode: 'index' as const
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -690,54 +859,30 @@ const Progress = () => {
               </div>
             </div>
 
-            {/* Weight History Timeline */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Weekly History</h3>
-              {weightTracking.slice().reverse().map((weight) => (
-                <div
-                  key={weight.id}
-                  className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="flex-shrink-0 w-16 text-center">
-                    <div className="text-xs text-gray-500 font-medium">Week</div>
-                    <div className="text-lg font-bold text-gray-900">{weight.week_number}</div>
-                  </div>
-
-                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div>
-                      <div className="text-xs text-gray-500">Weight</div>
-                      <div className="text-base font-semibold text-gray-900">{weight.weight_kg} kg</div>
+            {/* Weight Progress Chart */}
+            {getChartData() && (
+              <div className="mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                  <h3 className="text-sm font-semibold text-gray-700">📈 Weight Progress Chart</h3>
+                  <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                      <span className="text-gray-600">Workout</span>
                     </div>
-
-                    {weight.weight_lost_kg !== null && (
-                      <div>
-                        <div className="text-xs text-gray-500">Change</div>
-                        <div className={`text-base font-semibold ${
-                          weight.weight_lost_kg > 0
-                            ? 'text-green-600'
-                            : weight.weight_lost_kg < 0
-                            ? 'text-red-600'
-                            : 'text-gray-600'
-                        }`}>
-                          {weight.weight_lost_kg > 0 ? '-' : weight.weight_lost_kg < 0 ? '+' : ''}
-                          {Math.abs(weight.weight_lost_kg).toFixed(1)} kg
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="hidden sm:block">
-                      <div className="text-xs text-gray-500">Date</div>
-                      <div className="text-base text-gray-700">
-                        {new Date(weight.measurement_date).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric'
-                        })}
-                      </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="text-gray-600">Meal Plan</span>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+                <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200 shadow-sm">
+                  <div className="h-[250px] sm:h-[300px] md:h-[350px]">
+                    <Line data={getChartData()!} options={chartOptions} />
+                  </div>
+                </div>
+              </div>
+            )}
+
             </>
           )}
         </div>
@@ -928,6 +1073,71 @@ const Progress = () => {
                       </div>
                     )
                   })}
+
+                      {/* Weekly History for this Week */}
+                      {getWeekWeights(week.week_number).length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">⚖️ Weight History - Week {week.week_number}</h4>
+                          <div className="space-y-2">
+                            {getWeekWeights(week.week_number).map((weight) => (
+                              <div
+                                key={weight.id}
+                                className="flex items-center gap-3 p-3 bg-gradient-to-r from-gray-50 to-white rounded-lg border border-gray-200 hover:shadow-sm transition-shadow"
+                              >
+                                <div className="flex-shrink-0 w-12 text-center">
+                                  <div className="text-xl">
+                                    {weight.workout_plan_id ? '🏋️' : '🍽️'}
+                                  </div>
+                                </div>
+
+                                <div className="flex-1 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                  <div>
+                                    <div className="text-xs text-gray-500 font-medium">Weight</div>
+                                    <div className="text-sm font-bold text-gray-900">{weight.weight_kg} kg</div>
+                                  </div>
+
+                                  {weight.weight_lost_kg !== null && (
+                                    <div>
+                                      <div className="text-xs text-gray-500 font-medium">Change</div>
+                                      <div className={`text-sm font-bold ${
+                                        weight.weight_lost_kg > 0
+                                          ? 'text-green-600'
+                                          : weight.weight_lost_kg < 0
+                                          ? 'text-red-600'
+                                          : 'text-gray-600'
+                                      }`}>
+                                        {weight.weight_lost_kg > 0 ? '-' : weight.weight_lost_kg < 0 ? '+' : ''}
+                                        {Math.abs(weight.weight_lost_kg).toFixed(1)} kg
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <div className="hidden sm:block">
+                                    <div className="text-xs text-gray-500 font-medium">Date</div>
+                                    <div className="text-sm text-gray-700">
+                                      {new Date(weight.measurement_date).toLocaleDateString('en-US', {
+                                        month: 'short',
+                                        day: 'numeric',
+                                        year: 'numeric'
+                                      })}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex-shrink-0">
+                                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                    weight.workout_plan_id
+                                      ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                                      : 'bg-green-100 text-green-700 border border-green-200'
+                                  }`}>
+                                    {weight.workout_plan_id ? 'Workout' : 'Meal Plan'}
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

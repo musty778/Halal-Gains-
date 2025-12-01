@@ -1,7 +1,7 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components'
 import { RamadanProvider } from './contexts/RamadanContext'
-import Home from './pages/Home'
+import Dashboard from './pages/Dashboard'
 import Coaches from './pages/Coaches'
 import BrowseCoaches from './pages/BrowseCoaches'
 import CoachProfile from './pages/CoachProfile'
@@ -27,7 +27,8 @@ function App() {
         <Route path="/*" element={
           <Layout>
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/coaches" element={<Coaches />} />
               <Route path="/browse-coaches" element={<BrowseCoaches />} />
               <Route path="/coach/:id" element={<CoachProfile />} />

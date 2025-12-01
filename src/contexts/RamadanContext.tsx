@@ -1,26 +1,30 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
+import * as React from 'react'
 
 interface RamadanContextType {
   ramadanMode: boolean
   setRamadanMode: (value: boolean) => void
 }
 
-const RamadanContext = createContext<RamadanContextType | undefined>(undefined)
+const RamadanContext = React.createContext<RamadanContextType>({
+  ramadanMode: false,
+  setRamadanMode: () => {}
+})
 
-export const RamadanProvider = ({ children }: { children: ReactNode }) => {
-  const [ramadanMode, setRamadanMode] = useState(false)
+export function RamadanProvider({ children }: { children: React.ReactNode }) {
+  const [ramadanMode, setRamadanMode] = React.useState(false)
+
+  const value = React.useMemo(
+    () => ({ ramadanMode, setRamadanMode }),
+    [ramadanMode]
+  )
 
   return (
-    <RamadanContext.Provider value={{ ramadanMode, setRamadanMode }}>
+    <RamadanContext.Provider value={value}>
       {children}
     </RamadanContext.Provider>
   )
 }
 
-export const useRamadan = () => {
-  const context = useContext(RamadanContext)
-  if (context === undefined) {
-    throw new Error('useRamadan must be used within a RamadanProvider')
-  }
-  return context
+export function useRamadan() {
+  return React.useContext(RamadanContext)
 }
