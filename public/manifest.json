@@ -1,0 +1,24 @@
+{
+  "name": "Halal Gains - Islamic Fitness Platform",
+  "short_name": "Halal Gains",
+  "description": "A modern fitness coaching platform designed for Muslim coaches and clients",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

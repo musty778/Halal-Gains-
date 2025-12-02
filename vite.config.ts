@@ -4,7 +4,14 @@ import path from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react({
+      // Enable automatic JSX runtime
+      jsxRuntime: 'automatic',
+      // Add Fast Refresh for better dev experience
+      fastRefresh: true,
+    })
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -14,6 +21,44 @@ export default defineConfig({
       '@hooks': path.resolve(__dirname, './src/hooks'),
       '@utils': path.resolve(__dirname, './src/utils'),
       '@types': path.resolve(__dirname, './src/types'),
+    },
+  },
+  build: {
+    // Target modern browsers for smaller bundles
+    target: 'es2015',
+    // Enable minification
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.logs in production
+        drop_debugger: true,
+      },
+    },
+    // Chunk size warnings
+    chunkSizeWarningLimit: 1000,
+    // Manual chunks for better code splitting
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'chart-vendor': ['chart.js', 'react-chartjs-2'],
+          'supabase-vendor': ['@supabase/supabase-js'],
+          'icons-vendor': ['lucide-react'],
+        },
+      },
+    },
+  },
+  // Optimize deps
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', '@supabase/supabase-js'],
+  },
+  // Server configuration for better dev experience
+  server: {
+    port: 5173,
+    strictPort: false,
+    hmr: {
+      overlay: true,
     },
   },
 })
