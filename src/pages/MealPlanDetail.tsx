@@ -205,51 +205,90 @@ const MealPlanDetail = () => {
   const fetchMealPlanDays = async () => {
     if (!id || !currentUserId) return
 
-    const { data: daysData } = await supabase
-      .from('meal_plan_days')
-      .select('*')
-      .eq('meal_plan_id', id)
-      .order('day_number', { ascending: true })
+    // Fetch all data in parallel with proper joins to minimize queries
+    const [daysResult, mealsResult, foodsResult, completionsResult] = await Promise.all([
+      // Get all days
+      supabase
+        .from('meal_plan_days')
+        .select('*')
+        .eq('meal_plan_id', id)
+        .order('day_number', { ascending: true }),
 
-    if (daysData) {
-      const daysWithMeals = await Promise.all(
-        daysData.map(async (day) => {
-          const { data: mealsData } = await supabase
-            .from('meal_plan_meals')
-            .select('*')
-            .eq('meal_plan_day_id', day.id)
-            .order('meal_order', { ascending: true })
+      // Get all meals for this plan
+      supabase
+        .from('meal_plan_meals')
+        .select('*')
+        .in('meal_plan_day_id',
+          supabase.from('meal_plan_days')
+            .select('id')
+            .eq('meal_plan_id', id)
+        )
+        .order('meal_order', { ascending: true }),
 
-          const mealsWithFoods = await Promise.all(
-            (mealsData || []).map(async (meal) => {
-              const { data: foodsData } = await supabase
-                .from('meal_plan_foods')
-                .select('*')
-                .eq('meal_plan_meal_id', meal.id)
-                .order('food_order', { ascending: true })
+      // Get all foods for this plan's meals
+      supabase
+        .from('meal_plan_foods')
+        .select('*')
+        .in('meal_plan_meal_id',
+          supabase.from('meal_plan_meals')
+            .select('id')
+            .in('meal_plan_day_id',
+              supabase.from('meal_plan_days')
+                .select('id')
+                .eq('meal_plan_id', id)
+            )
+        )
+        .order('food_order', { ascending: true }),
 
-              return {
-                ...meal,
-                foods: foodsData || []
-              }
-            })
-          )
+      // Get all completions for this user's days
+      supabase
+        .from('meal_plan_day_completions')
+        .select('*')
+        .in('meal_plan_day_id',
+          supabase.from('meal_plan_days')
+            .select('id')
+            .eq('meal_plan_id', id)
+        )
+        .eq('user_id', currentUserId)
+    ])
 
-          // Get completion data for this day
-          const { data: completionData } = await supabase
-            .from('meal_plan_day_completions')
-            .select('*')
-            .eq('meal_plan_day_id', day.id)
-            .eq('user_id', currentUserId)
-            .single()
+    if (daysResult.data) {
+      // Build lookup maps for O(1) access
+      const mealsMap = new Map<string, any[]>()
+      mealsResult.data?.forEach(meal => {
+        if (!mealsMap.has(meal.meal_plan_day_id)) {
+          mealsMap.set(meal.meal_plan_day_id, [])
+        }
+        mealsMap.get(meal.meal_plan_day_id)!.push(meal)
+      })
 
-          return {
-            ...day,
-            meals: mealsWithFoods,
-            completion: completionData || undefined
-          }
-        })
-      )
+      const foodsMap = new Map<string, any[]>()
+      foodsResult.data?.forEach(food => {
+        if (!foodsMap.has(food.meal_plan_meal_id)) {
+          foodsMap.set(food.meal_plan_meal_id, [])
+        }
+        foodsMap.get(food.meal_plan_meal_id)!.push(food)
+      })
+
+      const completionsMap = new Map<string, any>()
+      completionsResult.data?.forEach(completion => {
+        completionsMap.set(completion.meal_plan_day_id, completion)
+      })
+
+      // Assemble the data structure
+      const daysWithMeals = daysResult.data.map(day => {
+        const dayMeals = mealsMap.get(day.id) || []
+        const mealsWithFoods = dayMeals.map(meal => ({
+          ...meal,
+          foods: foodsMap.get(meal.id) || []
+        }))
+
+        return {
+          ...day,
+          meals: mealsWithFoods,
+          completion: completionsMap.get(day.id) || undefined
+        }
+      })
 
       setMealPlanDays(daysWithMeals)
 

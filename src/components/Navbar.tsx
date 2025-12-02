@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { User } from '@supabase/supabase-js'
@@ -9,6 +9,7 @@ const Navbar = () => {
   const [user, setUser] = useState<User | null>(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [isCoach, setIsCoach] = useState(false)
+  const [coachProfileId, setCoachProfileId] = useState<string | null>(null)
   const navigate = useNavigate()
   const { ramadanMode } = useRamadan()
 
@@ -26,11 +27,12 @@ const Navbar = () => {
     return () => subscription.unsubscribe()
   }, [])
 
-  // Check if user is a coach
+  // Check if user is a coach and get profile ID (combined to avoid duplicate queries)
   useEffect(() => {
-    const checkIfCoach = async () => {
+    const checkUserProfile = async () => {
       if (!user) {
         setIsCoach(false)
+        setCoachProfileId(null)
         return
       }
 
@@ -41,61 +43,58 @@ const Navbar = () => {
         .single()
 
       setIsCoach(!!coachProfile)
+      setCoachProfileId(coachProfile?.id || null)
     }
 
-    checkIfCoach()
+    checkUserProfile()
   }, [user])
 
-  // Fetch unread message count
-  useEffect(() => {
+  // Fetch unread message count (memoized to use in subscriptions)
+  const fetchUnreadCount = useCallback(async () => {
     if (!user) {
       setUnreadCount(0)
       return
     }
 
-    const fetchUnreadCount = async () => {
-      // Get user's conversations
-      const { data: coachProfile } = await supabase
-        .from('coach_profiles')
+    let conversationIds: string[] = []
+
+    if (coachProfileId) {
+      // User is a coach - get conversations where they are the coach
+      const { data: convs } = await supabase
+        .from('conversations')
         .select('id')
-        .eq('user_id', user.id)
-        .single()
+        .eq('coach_id', coachProfileId)
 
-      let conversationIds: string[] = []
+      conversationIds = convs?.map(c => c.id) || []
+    } else {
+      // User is a client - get conversations where they are the client
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('client_id', user.id)
 
-      if (coachProfile) {
-        // User is a coach - get conversations where they are the coach
-        const { data: convs } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('coach_id', coachProfile.id)
-
-        conversationIds = convs?.map(c => c.id) || []
-      } else {
-        // User is a client - get conversations where they are the client
-        const { data: convs } = await supabase
-          .from('conversations')
-          .select('id')
-          .eq('client_id', user.id)
-
-        conversationIds = convs?.map(c => c.id) || []
-      }
-
-      if (conversationIds.length === 0) {
-        setUnreadCount(0)
-        return
-      }
-
-      // Count unread messages
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .in('conversation_id', conversationIds)
-        .eq('is_read', false)
-        .neq('sender_id', user.id)
-
-      setUnreadCount(count || 0)
+      conversationIds = convs?.map(c => c.id) || []
     }
+
+    if (conversationIds.length === 0) {
+      setUnreadCount(0)
+      return
+    }
+
+    // Count unread messages
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .in('conversation_id', conversationIds)
+      .eq('is_read', false)
+      .neq('sender_id', user.id)
+
+    setUnreadCount(count || 0)
+  }, [user, coachProfileId])
+
+  // Subscribe to messages and fetch initial count
+  useEffect(() => {
+    if (!user) return
 
     fetchUnreadCount()
 
@@ -119,7 +118,7 @@ const Navbar = () => {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user])
+  }, [user, fetchUnreadCount])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()

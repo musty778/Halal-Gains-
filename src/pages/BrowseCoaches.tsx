@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { CoachSpecialisation, Gender, TrainingAvailabilityType } from '../types'
@@ -43,7 +43,6 @@ const SPECIALISATION_OPTIONS: { value: CoachSpecialisation; label: string }[] = 
 const BrowseCoaches = () => {
   const navigate = useNavigate()
   const [coaches, setCoaches] = useState<CoachWithRating[]>([])
-  const [filteredCoaches, setFilteredCoaches] = useState<CoachWithRating[]>([])
   const [loading, setLoading] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
   const [filters, setFilters] = useState<Filters>({
@@ -89,7 +88,6 @@ const BrowseCoaches = () => {
         })
 
         setCoaches(coachesWithRatings)
-        setFilteredCoaches(coachesWithRatings)
       } catch (error) {
         console.error('Error fetching coaches:', error)
       } finally {
@@ -100,8 +98,8 @@ const BrowseCoaches = () => {
     fetchCoaches()
   }, [])
 
-  // Apply filters
-  useEffect(() => {
+  // Apply filters with memoization
+  const filteredCoaches = useMemo(() => {
     let result = [...coaches]
 
     // Search by name
@@ -157,7 +155,7 @@ const BrowseCoaches = () => {
       )
     }
 
-    setFilteredCoaches(result)
+    return result
   }, [filters, coaches])
 
   const clearFilters = () => {
@@ -173,14 +171,17 @@ const BrowseCoaches = () => {
     })
   }
 
-  const activeFiltersCount = [
-    filters.gender,
-    filters.location,
-    filters.specialisation,
-    filters.availabilityType,
-    filters.minRating > 0,
-    filters.minPrice > 0 || filters.maxPrice < 500,
-  ].filter(Boolean).length
+  // Memoize active filters count
+  const activeFiltersCount = useMemo(() => {
+    return [
+      filters.gender,
+      filters.location,
+      filters.specialisation,
+      filters.availabilityType,
+      filters.minRating > 0,
+      filters.minPrice > 0 || filters.maxPrice < 500,
+    ].filter(Boolean).length
+  }, [filters])
 
   return (
     <div className="min-h-screen bg-gray-50">

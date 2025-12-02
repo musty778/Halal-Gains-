@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 
@@ -54,15 +54,15 @@ const Chat = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Filter conversations based on search query
-  const filteredConversations = conversations.filter(conv => {
-    if (!searchQuery.trim()) return true
+  // Filter conversations based on search query (memoized)
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) return conversations
     const query = searchQuery.toLowerCase()
-    return (
+    return conversations.filter(conv =>
       conv.other_user_name?.toLowerCase().includes(query) ||
       conv.last_message?.toLowerCase().includes(query)
     )
-  })
+  }, [conversations, searchQuery])
 
   // Assign coach to client
   const handleStartWorkingTogether = async () => {

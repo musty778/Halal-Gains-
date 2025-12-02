@@ -50,6 +50,15 @@ interface WorkoutExercise {
   exercise_order: number
 }
 
+interface WorkoutWeekCompletion {
+  id: string
+  workout_plan_id: string
+  user_id: string
+  week_number: number
+  completed_at: string
+  weight_kg: number | null
+}
+
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 const WorkoutPlanDetail = () => {
@@ -58,6 +67,7 @@ const WorkoutPlanDetail = () => {
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null)
   const [coachInfo, setCoachInfo] = useState<CoachInfo | null>(null)
   const [workoutWeeks, setWorkoutWeeks] = useState<WorkoutWeek[]>([])
+  const [weekCompletions, setWeekCompletions] = useState<WorkoutWeekCompletion[]>([])
   const [loading, setLoading] = useState(true)
   const [isCoach, setIsCoach] = useState(false)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -115,6 +125,7 @@ const WorkoutPlanDetail = () => {
   useEffect(() => {
     if (currentUserId && workoutPlan) {
       fetchExerciseCompletions()
+      fetchWeekCompletions()
     }
   }, [currentUserId, isCoach, workoutPlan])
 
@@ -221,6 +232,30 @@ const WorkoutPlanDetail = () => {
       const completedIds = new Set(completionsData.map(c => c.exercise_id))
       setExerciseCompletions(completedIds)
     }
+  }
+
+  const fetchWeekCompletions = async () => {
+    if (!id || !currentUserId) return
+
+    // Determine which user's completions to fetch
+    let targetUserId = currentUserId
+    if (isCoach && workoutPlan?.client_id) {
+      targetUserId = workoutPlan.client_id
+    }
+
+    const { data } = await supabase
+      .from('workout_week_completions')
+      .select('*')
+      .eq('workout_plan_id', id)
+      .eq('user_id', targetUserId)
+
+    if (data) {
+      setWeekCompletions(data)
+    }
+  }
+
+  const getWeekCompletion = (weekNumber: number): WorkoutWeekCompletion | undefined => {
+    return weekCompletions.find(wc => wc.week_number === weekNumber)
   }
 
   const handleAddWeek = async () => {
@@ -400,6 +435,24 @@ const WorkoutPlanDetail = () => {
       }
 
       if (result && result.success) {
+        // Mark the week as completed
+        const { error: weekError } = await supabase
+          .from('workout_week_completions')
+          .insert({
+            workout_plan_id: id,
+            user_id: currentUserId,
+            week_number: selectedWeekForWeight.week_number,
+            weight_kg: weightValue
+          })
+
+        if (weekError) {
+          console.error('Error marking week as completed:', weekError)
+          alert('Weight recorded but failed to mark week as completed.')
+        }
+
+        // Refresh week completions
+        await fetchWeekCompletions()
+
         setShowWeightModal(false)
         setCurrentWeight('')
         setSelectedWeekForWeight(null)
@@ -644,7 +697,7 @@ const WorkoutPlanDetail = () => {
                         <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             <h3 className="font-semibold text-gray-900">Week {week.week_number}</h3>
-                            {!isCoach && weekCompleted && (
+                            {!isCoach && weekCompleted && !getWeekCompletion(week.week_number) && (
                               <button
                                 onClick={() => handleCompleteWeek(week)}
                                 className="px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
@@ -653,6 +706,17 @@ const WorkoutPlanDetail = () => {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Complete Week
+                              </button>
+                            )}
+                            {!isCoach && getWeekCompletion(week.week_number) && (
+                              <button
+                                disabled
+                                className="px-4 py-1.5 bg-gray-400 text-white text-sm font-medium rounded-lg cursor-not-allowed flex items-center gap-2"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Completed
                               </button>
                             )}
                           </div>

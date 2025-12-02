@@ -14,6 +14,8 @@ interface WorkoutPlan {
   updated_at: string
   client_name?: string
   client_photo?: string
+  completed_weeks?: number
+  total_weeks?: number
 }
 
 interface Client {
@@ -82,25 +84,78 @@ const WorkoutPlans = () => {
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        // Get client names and photos for assigned plans
-        const plansWithClientInfo = await Promise.all(
-          data.map(async (plan) => {
-            if (plan.client_id) {
-              const { data: clientData } = await supabase
-                .from('client_profiles')
-                .select('full_name, profile_photo')
-                .eq('user_id', plan.client_id)
-                .single()
+        // Get all unique client IDs
+        const clientIds = [...new Set(data.map(plan => plan.client_id).filter(Boolean))]
+        const planIds = data.map(plan => plan.id)
 
-              return {
-                ...plan,
-                client_name: clientData?.full_name || 'Unknown Client',
-                client_photo: clientData?.profile_photo
-              }
-            }
-            return plan
-          })
+        // Batch fetch all client data, weeks, and completions in parallel
+        const [clientsResult, weeksResult, completionsResult] = await Promise.all([
+          // Fetch all client profiles at once
+          clientIds.length > 0
+            ? supabase
+                .from('client_profiles')
+                .select('user_id, full_name, profile_photo')
+                .in('user_id', clientIds)
+            : Promise.resolve({ data: [] }),
+
+          // Fetch all weeks for all plans at once (only for client view)
+          !isCoach && planIds.length > 0
+            ? supabase
+                .from('workout_weeks')
+                .select('workout_plan_id, week_number')
+                .in('workout_plan_id', planIds)
+            : Promise.resolve({ data: [] }),
+
+          // Fetch all completions for current user at once (only for client view)
+          !isCoach && planIds.length > 0
+            ? supabase
+                .from('workout_week_completions')
+                .select('workout_plan_id, week_number')
+                .in('workout_plan_id', planIds)
+                .eq('user_id', currentUserId)
+            : Promise.resolve({ data: [] })
+        ])
+
+        // Create lookup maps for fast access
+        const clientsMap = new Map(
+          (clientsResult.data || []).map(c => [c.user_id, c])
         )
+
+        const weeksMap = new Map<string, number>()
+        const completionsMap = new Map<string, number>()
+
+        // Count weeks per plan
+        if (weeksResult.data) {
+          weeksResult.data.forEach(week => {
+            const count = weeksMap.get(week.workout_plan_id) || 0
+            weeksMap.set(week.workout_plan_id, count + 1)
+          })
+        }
+
+        // Count completions per plan
+        if (completionsResult.data) {
+          completionsResult.data.forEach(completion => {
+            const count = completionsMap.get(completion.workout_plan_id) || 0
+            completionsMap.set(completion.workout_plan_id, count + 1)
+          })
+        }
+
+        // Map the data
+        const plansWithClientInfo = data.map(plan => {
+          const clientData = plan.client_id ? clientsMap.get(plan.client_id) : undefined
+
+          return {
+            ...plan,
+            client_name: clientData?.full_name || (plan.client_id ? 'Unknown Client' : undefined),
+            client_photo: clientData?.profile_photo,
+            completed_weeks: !isCoach && plan.client_id === currentUserId
+              ? completionsMap.get(plan.id) || 0
+              : 0,
+            total_weeks: !isCoach && plan.client_id === currentUserId
+              ? weeksMap.get(plan.id) || 0
+              : 0
+          }
+        })
 
         setWorkoutPlans(plansWithClientInfo)
       }
@@ -109,7 +164,7 @@ const WorkoutPlans = () => {
     }
 
     fetchWorkoutPlans()
-  }, [currentUserId, coachProfileId])
+  }, [currentUserId, coachProfileId, isCoach])
 
   // Fetch clients (from conversations)
   useEffect(() => {
@@ -327,7 +382,22 @@ const WorkoutPlans = () => {
                     onClick={() => navigate(`/workout-plan/${plan.id}`)}
                     className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
                   >
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">{plan.name}</h3>
+                    <div className="flex items-start justify-between mb-3">
+                      <h3 className="text-lg font-semibold text-gray-900 flex-1">{plan.name}</h3>
+                      {plan.total_weeks && plan.total_weeks > 0 && (
+                        <div className="ml-2">
+                          {plan.completed_weeks === plan.total_weeks ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              ✓ Complete
+                            </span>
+                          ) : plan.completed_weeks && plan.completed_weeks > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              {plan.completed_weeks}/{plan.total_weeks} weeks
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
 
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center gap-2 text-gray-600">

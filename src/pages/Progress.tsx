@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import {
@@ -531,11 +531,12 @@ const Progress = () => {
     return { totalDays, completedDays }
   }
 
-  const getWeekWeights = (weekNumber: number) => {
+  const getWeekWeights = useCallback((weekNumber: number) => {
     return weightTracking.filter(w => w.week_number === weekNumber)
-  }
+  }, [weightTracking])
 
-  const getChartData = () => {
+  // Memoize chart data calculation
+  const chartData = useMemo(() => {
     if (weightTracking.length === 0) return null
 
     // Sort by date to ensure chronological order
@@ -582,9 +583,10 @@ const Progress = () => {
         }
       ]
     }
-  }
+  }, [weightTracking])
 
-  const chartOptions = {
+  // Memoize chart options
+  const chartOptions = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -669,7 +671,7 @@ const Progress = () => {
       intersect: false,
       mode: 'index' as const
     }
-  }
+  }), [weightTracking])
 
   if (loading) {
     return (
@@ -860,7 +862,7 @@ const Progress = () => {
             </div>
 
             {/* Weight Progress Chart */}
-            {getChartData() && (
+            {chartData && (
               <div className="mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                   <h3 className="text-sm font-semibold text-gray-700">📈 Weight Progress Chart</h3>
@@ -877,7 +879,7 @@ const Progress = () => {
                 </div>
                 <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl p-4 sm:p-6 border border-gray-200 shadow-sm">
                   <div className="h-[250px] sm:h-[300px] md:h-[350px]">
-                    <Line data={getChartData()!} options={chartOptions} />
+                    <Line data={chartData} options={chartOptions} />
                   </div>
                 </div>
               </div>

@@ -22,29 +22,41 @@ CREATE INDEX IF NOT EXISTS idx_meal_plan_week_completions_week
 ALTER TABLE meal_plan_week_completions ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can view their own week completions
-CREATE POLICY "Users can view own meal plan week completions"
-  ON meal_plan_week_completions
-  FOR SELECT
-  USING (auth.uid() = user_id);
+DO $$ BEGIN
+  CREATE POLICY "Users can view own meal plan week completions"
+    ON meal_plan_week_completions
+    FOR SELECT
+    USING (auth.uid() = user_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Policy: Users can insert their own week completions
-CREATE POLICY "Users can insert own meal plan week completions"
-  ON meal_plan_week_completions
-  FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
+DO $$ BEGIN
+  CREATE POLICY "Users can insert own meal plan week completions"
+    ON meal_plan_week_completions
+    FOR INSERT
+    WITH CHECK (auth.uid() = user_id);
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Policy: Coaches can view their clients' week completions
-CREATE POLICY "Coaches can view client meal plan week completions"
-  ON meal_plan_week_completions
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM meal_plans mp
-      JOIN coach_profiles cp ON cp.id = mp.coach_id
-      WHERE mp.id = meal_plan_week_completions.meal_plan_id
-        AND cp.user_id = auth.uid()
-    )
-  );
+DO $$ BEGIN
+  CREATE POLICY "Coaches can view client meal plan week completions"
+    ON meal_plan_week_completions
+    FOR SELECT
+    USING (
+      EXISTS (
+        SELECT 1 FROM meal_plans mp
+        JOIN coach_profiles cp ON cp.id = mp.coach_id
+        WHERE mp.id = meal_plan_week_completions.meal_plan_id
+          AND cp.user_id = auth.uid()
+      )
+    );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Grant permissions
 GRANT SELECT, INSERT ON meal_plan_week_completions TO authenticated;

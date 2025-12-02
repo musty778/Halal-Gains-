@@ -8,12 +8,16 @@ ALTER TABLE client_weight_tracking
   ADD COLUMN IF NOT EXISTS meal_plan_id UUID REFERENCES meal_plans(id) ON DELETE CASCADE;
 
 -- Add a check constraint to ensure either workout_plan_id or meal_plan_id is set (but not both)
-ALTER TABLE client_weight_tracking
-  ADD CONSTRAINT check_plan_type
-  CHECK (
-    (workout_plan_id IS NOT NULL AND meal_plan_id IS NULL) OR
-    (workout_plan_id IS NULL AND meal_plan_id IS NOT NULL)
-  );
+DO $$ BEGIN
+  ALTER TABLE client_weight_tracking
+    ADD CONSTRAINT check_plan_type
+    CHECK (
+      (workout_plan_id IS NOT NULL AND meal_plan_id IS NULL) OR
+      (workout_plan_id IS NULL AND meal_plan_id IS NOT NULL)
+    );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Update the unique constraint to handle both workout and meal plans
 ALTER TABLE client_weight_tracking
