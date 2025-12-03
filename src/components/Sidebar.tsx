@@ -50,23 +50,28 @@ const Sidebar = () => {
         return
       }
 
-      const { data: coachProfile } = await supabase
-        .from('coach_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
-      setIsCoach(!!coachProfile)
-
-      // Get client profile if not a coach
-      if (!coachProfile) {
-        const { data: clientData } = await supabase
+      // Run both queries in parallel to reduce wait time
+      const [coachResult, clientResult] = await Promise.all([
+        supabase
+          .from('coach_profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        supabase
           .from('client_profiles')
           .select('full_name, user_id')
           .eq('user_id', user.id)
-          .single()
+          .maybeSingle()
+      ])
 
-        setClientProfile(clientData)
+      const isCoachUser = !!coachResult.data
+      setIsCoach(isCoachUser)
+
+      // Set client profile only if not a coach
+      if (!isCoachUser && clientResult.data) {
+        setClientProfile(clientResult.data)
+      } else {
+        setClientProfile(null)
       }
     }
 

@@ -205,52 +205,51 @@ const MealPlanDetail = () => {
   const fetchMealPlanDays = async () => {
     if (!id || !currentUserId) return
 
-    // Fetch all data in parallel with proper joins to minimize queries
-    const [daysResult, mealsResult, foodsResult, completionsResult] = await Promise.all([
-      // Get all days
-      supabase
-        .from('meal_plan_days')
-        .select('*')
-        .eq('meal_plan_id', id)
-        .order('day_number', { ascending: true }),
+    // First, get all day IDs for this meal plan
+    const { data: days, error: daysError } = await supabase
+      .from('meal_plan_days')
+      .select('*')
+      .eq('meal_plan_id', id)
+      .order('day_number', { ascending: true })
 
-      // Get all meals for this plan
+    if (daysError || !days || days.length === 0) {
+      setMealPlanDays([])
+      return
+    }
+
+    const dayIds = days.map(d => d.id)
+
+    // Now fetch related data using the day IDs
+    const [mealsResult, completionsResult] = await Promise.all([
+      // Get all meals for these days
       supabase
         .from('meal_plan_meals')
         .select('*')
-        .in('meal_plan_day_id',
-          supabase.from('meal_plan_days')
-            .select('id')
-            .eq('meal_plan_id', id)
-        )
+        .in('meal_plan_day_id', dayIds)
         .order('meal_order', { ascending: true }),
-
-      // Get all foods for this plan's meals
-      supabase
-        .from('meal_plan_foods')
-        .select('*')
-        .in('meal_plan_meal_id',
-          supabase.from('meal_plan_meals')
-            .select('id')
-            .in('meal_plan_day_id',
-              supabase.from('meal_plan_days')
-                .select('id')
-                .eq('meal_plan_id', id)
-            )
-        )
-        .order('food_order', { ascending: true }),
 
       // Get all completions for this user's days
       supabase
         .from('meal_plan_day_completions')
         .select('*')
-        .in('meal_plan_day_id',
-          supabase.from('meal_plan_days')
-            .select('id')
-            .eq('meal_plan_id', id)
-        )
+        .in('meal_plan_day_id', dayIds)
         .eq('user_id', currentUserId)
     ])
+
+    // Get meal IDs for fetching foods
+    const mealIds = mealsResult.data?.map(m => m.id) || []
+
+    // Fetch foods if there are meals
+    let foodsResult = { data: [] as any[] }
+    if (mealIds.length > 0) {
+      foodsResult = await supabase
+        .from('meal_plan_foods')
+        .select('*')
+        .in('meal_plan_meal_id', mealIds)
+        .order('food_order', { ascending: true })
+    }
+
+    const daysResult = { data: days }
 
     if (daysResult.data) {
       // Build lookup maps for O(1) access
@@ -629,21 +628,7 @@ const MealPlanDetail = () => {
   const handleCompleteWeek = async (weekNumber: number, weekDays: MealPlanDay[]) => {
     if (!currentUserId) return
 
-    // Mark all days in the week as completed first
-    const incompleteDays = weekDays.filter(day => !day.completion)
-
-    for (const day of incompleteDays) {
-      await supabase
-        .from('meal_plan_day_completions')
-        .insert({
-          meal_plan_day_id: day.id,
-          user_id: currentUserId
-        })
-    }
-
-    await fetchMealPlanDays()
-
-    // Open weight modal
+    // Open weight modal first - days will be marked complete after weight submission
     setSelectedWeekForWeight({ weekNumber, days: weekDays })
     setShowWeightModal(true)
   }
@@ -654,6 +639,18 @@ const MealPlanDetail = () => {
     setSubmittingWeight(true)
 
     try {
+      // Mark all days in the week as completed
+      const incompleteDays = selectedWeekForWeight.days.filter(day => !day.completion)
+
+      for (const day of incompleteDays) {
+        await supabase
+          .from('meal_plan_day_completions')
+          .insert({
+            meal_plan_day_id: day.id,
+            user_id: currentUserId
+          })
+      }
+
       // Call the database function to record weight
       const { data, error } = await supabase.rpc('record_meal_plan_weekly_weight', {
         p_meal_plan_id: id,
@@ -684,11 +681,18 @@ const MealPlanDetail = () => {
       }
 
       // Refresh data
+      await fetchMealPlanDays()
       await fetchWeekCompletions()
+
+      // Show success message
+      const completedWeek = selectedWeekForWeight.weekNumber
+      const recordedWeight = currentWeight
+
       setShowWeightModal(false)
       setCurrentWeight('')
       setSelectedWeekForWeight(null)
-      alert('Week completed! Great job staying on track with your meal plan!')
+
+      alert(`🎉 Week ${completedWeek} Completed!\n\nWeight recorded: ${recordedWeight}kg\n\nGreat job staying consistent with your meal plan! Keep up the amazing work! 💪`)
     } catch (error) {
       alert('An error occurred. Please try again.')
     } finally {
@@ -897,15 +901,17 @@ const MealPlanDetail = () => {
                               </button>
                             )}
                             {!isCoach && getWeekCompletion(weekNumber) && (
-                              <button
-                                disabled
-                                className="px-4 py-1.5 bg-gray-400 text-white text-sm font-medium rounded-lg cursor-not-allowed flex items-center gap-2"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              <div className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold rounded-lg flex items-center gap-2 shadow-md">
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                Completed
-                              </button>
+                                <span>Completed ✓</span>
+                                {getWeekCompletion(weekNumber)?.weight_kg && (
+                                  <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                                    {getWeekCompletion(weekNumber)?.weight_kg}kg
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -919,49 +925,35 @@ const MealPlanDetail = () => {
                               const hasMultipleDaysInWeek = weekDays.length > 1
 
                               return (
-                                <div key={day.id} className={day.completion ? 'bg-green-50/30' : ''}>
+                                <div key={day.id}>
                                   {/* Day Header */}
-                                  <div
-                                    className={`px-4 py-3 ${!isExpanded && hasMultipleDaysInWeek ? 'cursor-pointer hover:bg-gray-50' : ''} ${isExpanded || !hasMultipleDaysInWeek ? 'border-b border-gray-200' : ''}`}
-                                    onClick={() => hasMultipleDaysInWeek && setExpandedDayId(isExpanded ? null : day.id)}
-                                  >
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                  <div className="px-4 py-3 border-b border-gray-200">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                       <div className="flex items-center gap-3 flex-1">
-                                        {/* Completion Checkbox - Only show for clients */}
-                                        {!isCoach && (
-                                          <div onClick={(e) => e.stopPropagation()}>
-                                            <input
-                                              type="checkbox"
-                                              checked={!!day.completion}
-                                              onChange={() => handleToggleDayCompletion(day)}
-                                              className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500 cursor-pointer"
-                                            />
-                                          </div>
-                                        )}
                                         {hasMultipleDaysInWeek && (
-                                          <svg
-                                            className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
-                                            fill="none"
-                                            stroke="currentColor"
-                                            viewBox="0 0 24 24"
+                                          <button
+                                            onClick={() => setExpandedDayId(isExpanded ? null : day.id)}
+                                            className="p-1 hover:bg-gray-100 rounded transition-colors"
                                           >
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                          </svg>
+                                            <svg
+                                              className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                                              fill="none"
+                                              stroke="currentColor"
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                          </button>
                                         )}
                                         <div className="flex-1">
-                                          <div className="flex items-center gap-2">
-                                            <h3 className="font-semibold text-gray-900">
+                                          <div className="flex items-center gap-3 mb-2">
+                                            <h3 className="font-bold text-gray-900 text-lg">
                                               Day {day.day_number}
                                               {day.day_name && ` - ${day.day_name}`}
                                             </h3>
-                                            {day.completion && (
-                                              <span className="inline-flex items-center gap-1 text-green-600 text-sm font-medium">
-                                                ✓ Completed
-                                              </span>
-                                            )}
                                           </div>
                                           {day.meals.length > 0 && (
-                                            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600 mt-1">
+                                            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
                                               <span>🔥 {dayTotals.calories} cal</span>
                                               <span>💪 {dayTotals.protein.toFixed(1)}g</span>
                                               <span>🍞 {dayTotals.carbs.toFixed(1)}g</span>
@@ -969,20 +961,59 @@ const MealPlanDetail = () => {
                                             </div>
                                           )}
                                         </div>
+
+                                        {/* Completion Pill - Only show for clients */}
+                                        {!isCoach && (
+                                          <div
+                                            onClick={() => handleToggleDayCompletion(day)}
+                                            className={`group/pill relative px-4 py-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                                              day.completion
+                                                ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-300/50 shadow-sm'
+                                                : 'bg-white/50 backdrop-blur-sm border-gray-200 hover:border-emerald-300 hover:shadow-md'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              {/* Checkbox Circle */}
+                                              <div className={`relative w-5 h-5 rounded-full border-2 flex-shrink-0 transition-all duration-200 ${
+                                                day.completion
+                                                  ? 'bg-emerald-500 border-emerald-500 scale-110'
+                                                  : 'border-gray-300 group-hover/pill:border-emerald-400'
+                                              }`}>
+                                                {day.completion && (
+                                                  <svg
+                                                    className="w-full h-full text-white p-0.5"
+                                                    fill="none"
+                                                    stroke="currentColor"
+                                                    viewBox="0 0 24 24"
+                                                  >
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                  </svg>
+                                                )}
+                                              </div>
+                                              <span className={`font-semibold text-sm transition-all duration-200 ${
+                                                day.completion
+                                                  ? 'text-emerald-700'
+                                                  : 'text-gray-800 group-hover/pill:text-gray-900'
+                                              }`}>
+                                                {day.completion ? 'Completed' : 'Mark Complete'}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                       {isCoach && coachInfo?.user_id === currentUserId && (
-                                        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <div className="flex items-center gap-2">
                                           <button
                                             onClick={() => openAddMealModal(day)}
-                                            className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                                            className="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
                                           >
-                                            Add Meal
+                                            + Add Meal
                                           </button>
                                           <button
                                             onClick={() => handleDeleteDay(day.id)}
-                                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                           >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                             </svg>
                                           </button>
@@ -990,7 +1021,7 @@ const MealPlanDetail = () => {
                                       )}
                                     </div>
                                     {day.notes && (
-                                      <p className="text-sm text-gray-600 mt-2">📝 {day.notes}</p>
+                                      <p className="text-sm text-gray-600 mt-3 px-1">📝 {day.notes}</p>
                                     )}
                                   </div>
 
@@ -1720,14 +1751,20 @@ const MealPlanDetail = () => {
 
       {/* Weight Entry Modal */}
       {showWeightModal && selectedWeekForWeight && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => !submittingWeight && setShowWeightModal(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">⚖️ Record Your Weight</h2>
-              <p className="text-gray-600 mb-4">
-                Congratulations on completing Week {selectedWeekForWeight.weekNumber}! Please enter your current weight to track your progress.
-              </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-200">
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">🎉 Week {selectedWeekForWeight.weekNumber} Complete!</h2>
+                <p className="text-gray-600">
+                  Great job staying on track! Please record your current weight to track your progress.
+                </p>
+              </div>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1744,7 +1781,7 @@ const MealPlanDetail = () => {
                     autoFocus
                   />
                 </div>
-                <div className="flex gap-3 pt-2">
+                <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => {
                       setShowWeightModal(false)
@@ -1752,16 +1789,28 @@ const MealPlanDetail = () => {
                       setSelectedWeekForWeight(null)
                     }}
                     disabled={submittingWeight}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-all disabled:opacity-50"
                   >
-                    Cancel
+                    Skip for Now
                   </button>
                   <button
                     onClick={handleSubmitWeight}
                     disabled={submittingWeight || !currentWeight}
-                    className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold hover:shadow-lg hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
                   >
-                    {submittingWeight ? 'Submitting...' : 'Submit Weight'}
+                    {submittingWeight ? (
+                      <>
+                        <div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Complete Week
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

@@ -30,7 +30,7 @@ export default defineConfig({
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true, // Remove console.logs in production
+        drop_console: false, // Keep console.logs for debugging
         drop_debugger: true,
       },
     },
@@ -55,8 +55,8 @@ export default defineConfig({
   },
   // Server configuration for better dev experience
   server: {
-    port: 5173,
-    strictPort: false,
+    port: 5175,
+    strictPort: true, // Always use port 5175, don't switch to another port
     hmr: {
       overlay: true,
     },
