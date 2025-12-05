@@ -769,33 +769,151 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Next Session Card with Pill */}
-        {todayWorkout && (
-          <div className="mb-8">
-            <div className="group relative">
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400 to-purple-400 rounded-2xl opacity-0 group-hover:opacity-10 blur transition duration-300"></div>
-              <div className="relative bg-white/60 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">Next Session</h3>
-                    <SessionPill
-                      status={getSessionStatus()}
-                      workoutType={todayWorkout.workout_type !== 'rest' ? todayWorkout.workout_type.charAt(0).toUpperCase() + todayWorkout.workout_type.slice(1).replace('_', ' ') : undefined}
-                    />
+        {/* Today's Workout Card */}
+        <div className="mb-8">
+          <div className="group relative">
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-2xl opacity-0 group-hover:opacity-10 blur transition duration-300"></div>
+            <div className="relative bg-white/60 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <Dumbbell className="w-5 h-5 text-white" />
                   </div>
-                  {todayWorkout.workout_type !== 'rest' && !isWorkoutDayCompleted && (
-                    <button
-                      onClick={() => navigate('/workout-plans')}
-                      className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
-                    >
-                      Start Workout
-                    </button>
-                  )}
+                  <h3 className="text-lg font-bold text-gray-900">Today's Workout</h3>
                 </div>
+                <button
+                  onClick={() => navigate('/workout-plans')}
+                  className="text-sm font-semibold text-emerald-600 hover:text-emerald-700 transition-colors"
+                >
+                  View All
+                </button>
               </div>
+
+              {weekWorkouts.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {weekWorkouts
+                    .filter((workout) => {
+                      // Filter out rest days and completed workouts
+                      if (workout.workout_type === 'rest') return false
+                      if (workout.exercises.length === 0) return false
+
+                      // Check if all exercises are completed
+                      const allCompleted = workout.exercises.every(ex =>
+                        workout.completion?.exercise_completions.find(ec => ec.workout_exercise_id === ex.id)?.completed
+                      )
+
+                      // Only show incomplete workouts
+                      return !allCompleted
+                    })
+                    .map((workout) => {
+                    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+                    const isToday = workout.day_of_week === new Date().getDay()
+                    const workoutCompleted = workout.exercises.every(ex =>
+                      workout.completion?.exercise_completions.find(ec => ec.workout_exercise_id === ex.id)?.completed
+                    )
+                    const isToggling = togglingExercise !== null
+
+                    return (
+                      <div
+                        key={workout.id}
+                        onClick={async () => {
+                          if (isToggling || workout.workout_type === 'rest') return
+
+                          // Mark all exercises in this workout as complete/incomplete
+                          const markAsComplete = !workoutCompleted
+                          for (const exercise of workout.exercises) {
+                            const currentlyCompleted = workout.completion?.exercise_completions.find(
+                              ec => ec.workout_exercise_id === exercise.id
+                            )?.completed || false
+                            if (currentlyCompleted !== markAsComplete) {
+                              await handleToggleExercise(exercise.id, currentlyCompleted)
+                            }
+                          }
+                        }}
+                        className={`group/pill relative px-4 py-3 rounded-full border-2 transition-all duration-200 ${
+                          workout.workout_type === 'rest'
+                            ? 'cursor-default'
+                            : 'cursor-pointer hover:scale-105'
+                        } ${
+                          isToggling
+                            ? 'opacity-60 cursor-wait'
+                            : ''
+                        } ${
+                          workoutCompleted
+                            ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-400 shadow-md'
+                            : isToday
+                            ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-400 shadow-md ring-2 ring-blue-200'
+                            : 'bg-white/50 backdrop-blur-sm border-gray-300 hover:border-emerald-400 hover:shadow-md'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {/* Checkbox */}
+                          {workout.workout_type !== 'rest' && (
+                            <div className={`relative w-4 h-4 rounded-full border-2 flex-shrink-0 transition-all duration-200 ${
+                              workoutCompleted
+                                ? 'bg-emerald-500 border-emerald-500 scale-110'
+                                : 'border-gray-400 group-hover/pill:border-emerald-500'
+                            }`}>
+                              {workoutCompleted && !isToggling && (
+                                <svg
+                                  className="w-full h-full text-white p-0.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Day Name */}
+                          <span className={`font-bold text-sm transition-all duration-200 ${
+                            workoutCompleted
+                              ? 'text-emerald-700'
+                              : isToday
+                              ? 'text-blue-700'
+                              : 'text-gray-700 group-hover/pill:text-gray-900'
+                          }`}>
+                            {dayNames[workout.day_of_week]}
+                          </span>
+
+                          {/* Workout Type Badge */}
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
+                            workoutCompleted
+                              ? 'bg-emerald-200 text-emerald-800'
+                              : workout.workout_type === 'rest'
+                              ? 'bg-purple-200 text-purple-800'
+                              : isToday
+                              ? 'bg-blue-200 text-blue-800'
+                              : 'bg-gray-200 text-gray-700'
+                          }`}>
+                            {workout.workout_type === 'rest'
+                              ? '😴 Rest'
+                              : workout.workout_type.charAt(0).toUpperCase() + workout.workout_type.slice(1).replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Dumbbell className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 mb-4 font-medium">No workout assigned</p>
+                  <button
+                    onClick={() => navigate('/workout-plans')}
+                    className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
+                  >
+                    View Plans
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </div>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -823,7 +941,21 @@ const Dashboard = () => {
                   <div className="w-full">
                     {/* This Week's Workouts */}
                     <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-                      {weekWorkouts.map((workout) => {
+                      {weekWorkouts
+                        .filter((workout) => {
+                          // Filter out rest days and completed workouts
+                          if (workout.workout_type === 'rest') return false
+                          if (workout.exercises.length === 0) return false
+
+                          // Check if all exercises are completed
+                          const allCompleted = workout.exercises.every(ex =>
+                            workout.completion?.exercise_completions.find(ec => ec.workout_exercise_id === ex.id)?.completed
+                          )
+
+                          // Only show incomplete workouts
+                          return !allCompleted
+                        })
+                        .map((workout) => {
                         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
                         const isToday = workout.day_of_week === new Date().getDay()
                         const workoutCompleted = workout.exercises.every(ex =>

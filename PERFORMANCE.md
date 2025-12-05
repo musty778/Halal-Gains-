@@ -171,3 +171,4 @@ npm run build
 - [Vite Performance](https://vitejs.dev/guide/performance.html)
 - [Supabase Best Practices](https://supabase.com/docs/guides/database/performance)
 
+

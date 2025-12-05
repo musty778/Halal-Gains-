@@ -49,3 +49,4 @@ export function useSupabaseQuery<T>({
   return { data, loading, error, refetch: fetchData }
 }
 
+

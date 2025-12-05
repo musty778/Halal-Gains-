@@ -1,4 +1,4 @@
-const CACHE_NAME = 'halal-gains-v1'
+const CACHE_NAME = 'halal-gains-v4-fresh'
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -29,18 +29,44 @@ self.addEventListener('activate', (event) => {
   self.clients.claim()
 })
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - network first for HTML, cache first for assets
 self.addEventListener('fetch', (event) => {
   // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) {
     return
   }
 
-  // Skip Supabase API requests (always fetch fresh)
-  if (event.request.url.includes('supabase.co')) {
+  // Skip Supabase API requests and auth requests (always fetch fresh)
+  if (event.request.url.includes('supabase.co') ||
+      event.request.url.includes('/auth/') ||
+      event.request.method !== 'GET') {
     return
   }
 
+  // Network-first strategy for HTML files (always get fresh content)
+  if (event.request.headers.get('accept')?.includes('text/html') ||
+      event.request.url.endsWith('/') ||
+      event.request.url.includes('/browse-coaches') ||
+      event.request.url.includes('/dashboard')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Cache the fresh response
+          const responseToCache = response.clone()
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache)
+          })
+          return response
+        })
+        .catch(() => {
+          // Fallback to cache if network fails
+          return caches.match(event.request)
+        })
+    )
+    return
+  }
+
+  // Cache-first strategy for static assets
   event.respondWith(
     caches.match(event.request).then((response) => {
       if (response) {
@@ -65,4 +91,5 @@ self.addEventListener('fetch', (event) => {
     })
   )
 })
+
 

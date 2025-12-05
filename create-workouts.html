@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Sample Workouts</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: linear-gradient(to bottom right, #f8fafc, #e0f2fe);
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #059669;
+      margin-bottom: 20px;
+    }
+    button {
+      background: linear-gradient(to right, #10b981, #14b8a6);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    #output {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .success { color: #059669; }
+    .error { color: #dc2626; }
+    .info { color: #0284c7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🏋️ Create Workout Plan (Coach)</h1>
+    <p>As a coach, create a workout plan for your client.</p>
+
+    <div style="margin-bottom: 20px;">
+      <label style="display: block; margin-bottom: 8px; font-weight: 600;">Client Name:</label>
+      <input type="text" id="clientName" placeholder="Enter client name (e.g., John 123)"
+             style="width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 14px;">
+    </div>
+
+    <button id="createBtn" onclick="createWorkouts()">Create Workout Plan for Client</button>
+    <div id="output"></div>
+  </div>
+
+  <script type="module">
+    const supabaseUrl = 'https://dukpetyemyhszdcnkmuq.supabase.co'
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1a3BldHllbXloc3pkY25rbXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzNzA1NDksImV4cCI6MjA3ODk0NjU0OX0.jlUFy_UzoYuprcj62C8vt10YklvjUrXU0injcK-x65U'
+
+    const { createClient } = supabase
+    const sb = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
+
+    window.createWorkouts = async function() {
+      const outputEl = document.getElementById('output')
+      const btn = document.getElementById('createBtn')
+      const clientNameInput = document.getElementById('clientName')
+      outputEl.innerHTML = ''
+      btn.disabled = true
+
+      function log(message, type = 'info') {
+        const line = document.createElement('div')
+        line.className = type
+        line.textContent = message
+        outputEl.appendChild(line)
+      }
+
+      try {
+        log('🏋️ Starting workout plan creation...', 'info')
+
+        // Get current user (should be the coach)
+        const { data: { user }, error: authError } = await sb.auth.getUser()
+
+        if (authError || !user) {
+          log('❌ Error: You must be logged in as a coach to create workouts', 'error')
+          btn.disabled = false
+          return
+        }
+
+        log(`✅ Logged in as: ${user.email}`, 'success')
+
+        // Verify this user is a coach
+        const { data: coachProfile, error: coachError } = await sb
+          .from('coach_profiles')
+          .select('id, full_name')
+          .eq('user_id', user.id)
+          .single()
+
+        if (coachError || !coachProfile) {
+          log('❌ Error: You must be logged in as a coach to create workout plans', 'error')
+          log('ℹ️  Please log in with a coach account (e.g., Mike 123)', 'info')
+          btn.disabled = false
+          return
+        }
+
+        log(`✅ Coach profile found: ${coachProfile.full_name}`, 'success')
+
+        // Get client name from input
+        const clientName = clientNameInput.value.trim()
+        if (!clientName) {
+          log('❌ Error: Please enter a client name', 'error')
+          btn.disabled = false
+          return
+        }
+
+        // Find the client by name
+        const { data: clientProfiles, error: clientError } = await sb
+          .from('client_profiles')
+          .select('user_id, full_name')
+          .ilike('full_name', `%${clientName}%`)
+          .limit(5)
+
+        if (clientError || !clientProfiles || clientProfiles.length === 0) {
+          log(`❌ Error: Client "${clientName}" not found`, 'error')
+          log('ℹ️  Make sure the client has signed up and created a profile', 'info')
+          btn.disabled = false
+          return
+        }
+
+        if (clientProfiles.length > 1) {
+          log('ℹ️  Multiple clients found:', 'info')
+          clientProfiles.forEach(c => log(`  - ${c.full_name}`, 'info'))
+          log('ℹ️  Using first match...', 'info')
+        }
+
+        const client = clientProfiles[0]
+        log(`✅ Found client: ${client.full_name}`, 'success')
+
+        // Create workout plan for the client
+        log('Creating workout plan...', 'info')
+        const { data: workoutPlan, error: planError } = await sb
+          .from('workout_plans')
+          .insert({
+            client_id: client.user_id,
+            coach_id: coachProfile.id,
+            name: 'Beginner Full Body Program',
+            description: 'A balanced full body workout plan for beginners'
+          })
+          .select()
+          .single()
+
+        if (planError) {
+          log(`❌ Error creating workout plan: ${planError.message}`, 'error')
+          btn.disabled = false
+          return
+        }
+
+        log(`✅ Created workout plan: "${workoutPlan.name}"`, 'success')
+
+        // Create workout week
+        const { data: workoutWeek, error: weekError } = await sb
+          .from('workout_weeks')
+          .insert({
+            workout_plan_id: workoutPlan.id,
+            week_number: 1
+          })
+          .select()
+          .single()
+
+        if (weekError) {
+          log(`❌ Error creating workout week: ${weekError.message}`, 'error')
+          btn.disabled = false
+          return
+        }
+
+        log('✅ Created Week 1', 'success')
+
+        // Define workout days
+        const workoutDays = [
+          { day: 0, type: 'rest', exercises: [] },
+          { day: 1, type: 'upper_body', exercises: [
+            { name: 'Push-ups', sets: 3, reps: 12, order: 1 },
+            { name: 'Dumbbell Rows', sets: 3, reps: 10, order: 2 },
+            { name: 'Shoulder Press', sets: 3, reps: 10, order: 3 },
+            { name: 'Bicep Curls', sets: 3, reps: 12, order: 4 }
+          ]},
+          { day: 2, type: 'cardio', exercises: [
+            { name: 'Running', sets: 1, reps: 30, order: 1 },
+            { name: 'Jump Rope', sets: 3, reps: 100, order: 2 }
+          ]},
+          { day: 3, type: 'lower_body', exercises: [
+            { name: 'Squats', sets: 4, reps: 12, order: 1 },
+            { name: 'Lunges', sets: 3, reps: 10, order: 2 },
+            { name: 'Leg Press', sets: 3, reps: 12, order: 3 },
+            { name: 'Calf Raises', sets: 3, reps: 15, order: 4 }
+          ]},
+          { day: 4, type: 'rest', exercises: [] },
+          { day: 5, type: 'full_body', exercises: [
+            { name: 'Deadlifts', sets: 3, reps: 8, order: 1 },
+            { name: 'Bench Press', sets: 3, reps: 10, order: 2 },
+            { name: 'Pull-ups', sets: 3, reps: 8, order: 3 },
+            { name: 'Plank', sets: 3, reps: 60, order: 4 }
+          ]},
+          { day: 6, type: 'cardio', exercises: [
+            { name: 'Cycling', sets: 1, reps: 45, order: 1 },
+            { name: 'HIIT Training', sets: 5, reps: 3, order: 2 }
+          ]}
+        ]
+
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+        // Create days and exercises
+        for (const day of workoutDays) {
+          const { data: workoutDay, error: dayError } = await sb
+            .from('workout_days')
+            .insert({
+              workout_week_id: workoutWeek.id,
+              day_of_week: day.day,
+              workout_type: day.type
+            })
+            .select()
+            .single()
+
+          if (dayError) {
+            log(`❌ Error creating ${dayNames[day.day]}: ${dayError.message}`, 'error')
+            continue
+          }
+
+          log(`✅ ${dayNames[day.day]} - ${day.type}`, 'success')
+
+          // Add exercises
+          if (day.exercises.length > 0) {
+            const exercisesToInsert = day.exercises.map(ex => ({
+              workout_day_id: workoutDay.id,
+              exercise_name: ex.name,
+              sets: ex.sets,
+              reps: ex.reps,
+              exercise_order: ex.order
+            }))
+
+            const { error: exError } = await sb
+              .from('workout_exercises')
+              .insert(exercisesToInsert)
+
+            if (exError) {
+              log(`  ❌ Error adding exercises: ${exError.message}`, 'error')
+            } else {
+              log(`  ✅ Added ${day.exercises.length} exercises`, 'success')
+            }
+          }
+        }
+
+        log('\n🎉 SUCCESS! Workout plan created!', 'success')
+        log(`📱 ${client.full_name} can now see this workout plan on their dashboard!`, 'info')
+        log('ℹ️  Ask the client to log in and refresh their dashboard to see the workout pills.', 'info')
+
+      } catch (error) {
+        log(`❌ Unexpected error: ${error.message}`, 'error')
+      } finally {
+        btn.disabled = false
+      }
+    }
+  </script>
+</body>
+</html>

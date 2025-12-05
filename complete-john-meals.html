@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Complete John's Meal Plans</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: linear-gradient(to bottom right, #f8fafc, #e0f2fe);
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      color: #059669;
+      margin-bottom: 20px;
+    }
+    button {
+      background: linear-gradient(to right, #f97316, #ec4899);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    #output {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f1f5f9;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    .success { color: #059669; }
+    .error { color: #dc2626; }
+    .info { color: #0284c7; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🍽️ Complete John 123's Meal Plans</h1>
+    <p>This will mark all meal plan days as completed for John 123.</p>
+    <button id="completeBtn" onclick="completeMealPlans()">Complete All Meal Plans</button>
+    <div id="output"></div>
+  </div>
+
+  <script type="module">
+    const supabaseUrl = 'https://dukpetyemyhszdcnkmug.supabase.co'
+    const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1a3BldHllbXloc3pkY25rbXVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzNzA1NDksImV4cCI6MjA3ODk0NjU0OX0.jlUFy_UzoYuprcj62C8vt10YklvjUrXU0injcK-x65U'
+
+    const { createClient } = supabase
+    const sb = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    })
+
+    window.completeMealPlans = async function() {
+      const outputEl = document.getElementById('output')
+      const btn = document.getElementById('completeBtn')
+      outputEl.innerHTML = ''
+      btn.disabled = true
+
+      function log(message, type = 'info') {
+        const line = document.createElement('div')
+        line.className = type
+        line.textContent = message
+        outputEl.appendChild(line)
+      }
+
+      try {
+        log('🍽️ Starting meal plan completion for John 123...', 'info')
+
+        // Find John 123's client profile
+        const { data: clientProfiles, error: clientError } = await sb
+          .from('client_profiles')
+          .select('user_id, full_name')
+          .ilike('full_name', '%John%123%')
+          .limit(5)
+
+        if (clientError) {
+          log(`❌ Error finding client: ${clientError.message}`, 'error')
+          btn.disabled = false
+          return
+        }
+
+        if (!clientProfiles || clientProfiles.length === 0) {
+          log('❌ Error: John 123 not found', 'error')
+          log('ℹ️  Searching for any client with "John"...', 'info')
+
+          const { data: anyJohn } = await sb
+            .from('client_profiles')
+            .select('user_id, full_name')
+            .ilike('full_name', '%John%')
+            .limit(5)
+
+          if (anyJohn && anyJohn.length > 0) {
+            log('ℹ️  Found these clients:', 'info')
+            anyJohn.forEach(c => log(`  - ${c.full_name}`, 'info'))
+          }
+          btn.disabled = false
+          return
+        }
+
+        const client = clientProfiles[0]
+        log(`✅ Found client: ${client.full_name}`, 'success')
+
+        // Get meal plan for this client
+        const { data: mealPlans, error: planError } = await sb
+          .from('meal_plans')
+          .select('id, name')
+          .eq('client_id', client.user_id)
+          .limit(1)
+
+        if (planError) {
+          log(`❌ Error fetching meal plans: ${planError.message}`, 'error')
+          btn.disabled = false
+          return
+        }
+
+        if (!mealPlans || mealPlans.length === 0) {
+          log('❌ No meal plans found for John 123', 'error')
+          btn.disabled = false
+          return
+        }
+
+        const mealPlan = mealPlans[0]
+        log(`✅ Found meal plan: "${mealPlan.name}"`, 'success')
+
+        // Get all meal plan days
+        const { data: mealDays, error: daysError } = await sb
+          .from('meal_plan_days')
+          .select('id, day_number, day_name')
+          .eq('meal_plan_id', mealPlan.id)
+          .order('day_number', { ascending: true })
+
+        if (daysError) {
+          log(`❌ Error fetching meal plan days: ${daysError.message}`, 'error')
+          btn.disabled = false
+          return
+        }
+
+        if (!mealDays || mealDays.length === 0) {
+          log('❌ No meal plan days found', 'error')
+          btn.disabled = false
+          return
+        }
+
+        log(`✅ Found ${mealDays.length} meal plan days`, 'success')
+
+        // Mark all days as completed
+        let completedCount = 0
+        let alreadyCompletedCount = 0
+
+        for (const day of mealDays) {
+          // Check if already completed
+          const { data: existing } = await sb
+            .from('meal_plan_day_completions')
+            .select('id')
+            .eq('meal_plan_day_id', day.id)
+            .eq('user_id', client.user_id)
+            .maybeSingle()
+
+          if (existing) {
+            alreadyCompletedCount++
+            log(`ℹ️  Day ${day.day_number} (${day.day_name || 'Unnamed'}) - Already completed`, 'info')
+            continue
+          }
+
+          // Insert completion
+          const { error: completionError } = await sb
+            .from('meal_plan_day_completions')
+            .insert({
+              meal_plan_day_id: day.id,
+              user_id: client.user_id
+            })
+
+          if (completionError) {
+            log(`❌ Error completing Day ${day.day_number}: ${completionError.message}`, 'error')
+          } else {
+            completedCount++
+            log(`✅ Completed Day ${day.day_number} (${day.day_name || 'Unnamed'})`, 'success')
+          }
+        }
+
+        log('\n🎉 Summary:', 'success')
+        log(`  ✅ Newly completed: ${completedCount} days`, 'success')
+        log(`  ℹ️  Already completed: ${alreadyCompletedCount} days`, 'info')
+        log(`  📊 Total: ${mealDays.length} days`, 'info')
+
+        if (completedCount > 0) {
+          log('\n📱 John 123 can now see these completions on the dashboard!', 'success')
+        }
+
+      } catch (error) {
+        log(`❌ Unexpected error: ${error.message}`, 'error')
+      } finally {
+        btn.disabled = false
+      }
+    }
+  </script>
+</body>
+</html>

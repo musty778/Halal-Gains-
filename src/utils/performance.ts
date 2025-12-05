@@ -122,3 +122,4 @@ export const preloadResource = (url: string, as: 'script' | 'style' | 'image' | 
   document.head.appendChild(link)
 }
 
+
