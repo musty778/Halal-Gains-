@@ -119,6 +119,8 @@ const Progress = () => {
   const [clients, setClients] = useState<any[]>([])
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null)
   const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set())
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false)
 
   const [exerciseData, setExerciseData] = useState<{ [key: string]: LogExerciseData }>({})
 
@@ -734,55 +736,160 @@ const Progress = () => {
 
           {/* Client Selector for Coaches */}
           {isCoach && clients.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Select Client
               </label>
-              <select
-                value={selectedClientId || ''}
-                onChange={(e) => setSelectedClientId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                {clients.map(client => (
-                  <option key={client.user_id} value={client.user_id}>
-                    {client.full_name}
-                  </option>
-                ))}
-              </select>
+
+              {/* Custom Client Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                  className="w-full flex items-center gap-3 px-5 py-4 bg-white border-2 border-emerald-300 rounded-2xl shadow-md hover:shadow-lg hover:border-emerald-400 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 group"
+                >
+                  {/* Selected Client Name */}
+                  <span className="flex-1 text-left font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">
+                    {clients.find(c => c.user_id === selectedClientId)?.full_name || 'Select a client'}
+                  </span>
+
+                  {/* Dropdown Arrow */}
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-all duration-300 ${isClientDropdownOpen ? 'rotate-180 text-emerald-500' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {isClientDropdownOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsClientDropdownOpen(false)}
+                    />
+
+                    {/* Dropdown Options */}
+                    <div className="absolute z-20 w-full mt-2 bg-white border-2 border-emerald-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                      {clients.map((client, index) => (
+                        <button
+                          key={client.user_id}
+                          onClick={() => {
+                            setSelectedClientId(client.user_id)
+                            setIsClientDropdownOpen(false)
+                          }}
+                          className={`w-full px-5 py-4 text-left hover:bg-emerald-50 transition-all duration-200 flex items-center gap-3 group ${
+                            selectedClientId === client.user_id ? 'bg-emerald-50' : ''
+                          } ${index > 0 ? 'border-t border-gray-100' : ''}`}
+                          style={{
+                            animationDelay: `${index * 50}ms`,
+                            animation: 'slideIn 0.3s ease-out forwards'
+                          }}
+                        >
+                          {/* Client Name */}
+                          <span className={`font-semibold ${
+                            selectedClientId === client.user_id ? 'text-emerald-700' : 'text-gray-700 group-hover:text-emerald-600'
+                          }`}>
+                            {client.full_name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 
           {/* Plan Selector */}
           {workoutPlans.length > 1 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
                 Select Workout Plan
               </label>
-              <select
-                value={selectedPlanId || ''}
-                onChange={(e) => setSelectedPlanId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                {workoutPlans.map(plan => (
-                  <option key={plan.id} value={plan.id}>
-                    {plan.name}
-                  </option>
-                ))}
-              </select>
+
+              {/* Custom Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="w-full flex items-center gap-3 px-5 py-4 bg-white border-2 border-emerald-300 rounded-2xl shadow-md hover:shadow-lg hover:border-emerald-400 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 group"
+                >
+                  {/* Selected Plan Name */}
+                  <span className="flex-1 text-left font-semibold text-gray-900 group-hover:text-emerald-600 transition-colors">
+                    {workoutPlans.find(p => p.id === selectedPlanId)?.name || 'Select a plan'}
+                  </span>
+
+                  {/* Dropdown Arrow */}
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-all duration-300 ${isDropdownOpen ? 'rotate-180 text-emerald-500' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Dropdown Menu */}
+                {isDropdownOpen && (
+                  <>
+                    {/* Backdrop */}
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsDropdownOpen(false)}
+                    />
+
+                    {/* Dropdown Options */}
+                    <div className="absolute z-20 w-full mt-2 bg-white border-2 border-emerald-200 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                      {workoutPlans.map((plan, index) => (
+                        <button
+                          key={plan.id}
+                          onClick={() => {
+                            setSelectedPlanId(plan.id)
+                            setIsDropdownOpen(false)
+                          }}
+                          className={`w-full px-5 py-4 text-left hover:bg-emerald-50 transition-all duration-200 flex items-center gap-3 group ${
+                            selectedPlanId === plan.id ? 'bg-emerald-50' : ''
+                          } ${index > 0 ? 'border-t border-gray-100' : ''}`}
+                          style={{
+                            animationDelay: `${index * 50}ms`,
+                            animation: 'slideIn 0.3s ease-out forwards'
+                          }}
+                        >
+                          {/* Plan Name */}
+                          <span className={`font-semibold ${
+                            selectedPlanId === plan.id ? 'text-emerald-700' : 'text-gray-700 group-hover:text-emerald-600'
+                          }`}>
+                            {plan.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         {/* Weight Tracking Section */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">⚖️ Weight Progress</h2>
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 md:p-8 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
+              Weight Progress
+            </h2>
             {!isCoach && (
               <button
                 onClick={() => setShowAddWeightModal(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 text-sm font-bold"
               >
-                ➕ Add Weight
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                Add Weight
               </button>
             )}
           </div>
@@ -798,66 +905,108 @@ const Progress = () => {
           ) : (
             <>
             {/* Weight Stats Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="text-sm text-blue-700 font-medium mb-1">Current Weight</div>
-                <div className="text-2xl font-bold text-blue-900">
-                  {weightTracking[weightTracking.length - 1].weight_kg} kg
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mb-8">
+              {/* Current Weight Card */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-50 via-cyan-50 to-blue-50 border-2 border-blue-200/50 p-6 shadow-lg hover:shadow-xl transition-all duration-300 group">
+                {/* Glassy overlay */}
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-sm"></div>
+
+                {/* Content */}
+                <div className="relative z-10">
+                  <div className="text-sm text-blue-700 font-bold mb-2 tracking-wide uppercase">Current Weight</div>
+                  <div className="text-3xl font-bold text-blue-900 mb-1">
+                    {weightTracking[weightTracking.length - 1].weight_kg} <span className="text-xl text-blue-700">kg</span>
+                  </div>
+                  <div className="text-xs text-blue-600 font-semibold">
+                    Week {weightTracking[weightTracking.length - 1].week_number}
+                  </div>
                 </div>
-                <div className="text-xs text-blue-600 mt-1">
-                  Week {weightTracking[weightTracking.length - 1].week_number}
-                </div>
+
+                {/* Decorative element */}
+                <div className="absolute -bottom-2 -right-2 w-20 h-20 bg-blue-200/30 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-300"></div>
               </div>
 
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="text-sm text-green-700 font-medium mb-1">Starting Weight</div>
-                <div className="text-2xl font-bold text-green-900">
-                  {weightTracking[0].weight_kg} kg
+              {/* Starting Weight Card */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-50 via-teal-50 to-emerald-50 border-2 border-emerald-200/50 p-6 shadow-lg hover:shadow-xl transition-all duration-300 group">
+                {/* Glassy overlay */}
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-sm"></div>
+
+                {/* Content */}
+                <div className="relative z-10">
+                  <div className="text-sm text-emerald-700 font-bold mb-2 tracking-wide uppercase">Starting Weight</div>
+                  <div className="text-3xl font-bold text-emerald-900 mb-1">
+                    {weightTracking[0].weight_kg} <span className="text-xl text-emerald-700">kg</span>
+                  </div>
+                  <div className="text-xs text-emerald-600 font-semibold">
+                    Week {weightTracking[0].week_number}
+                  </div>
                 </div>
-                <div className="text-xs text-green-600 mt-1">
-                  Week {weightTracking[0].week_number}
-                </div>
+
+                {/* Decorative element */}
+                <div className="absolute -bottom-2 -right-2 w-20 h-20 bg-emerald-200/30 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-300"></div>
               </div>
 
-              <div className={`${
+              {/* Total Change Card */}
+              <div className={`relative overflow-hidden rounded-2xl border-2 p-6 shadow-lg hover:shadow-xl transition-all duration-300 group ${
                 weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
-                  ? 'bg-purple-50 border-purple-200'
+                  ? 'bg-gradient-to-br from-purple-50 via-pink-50 to-purple-50 border-purple-200/50'
                   : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
-                  ? 'bg-orange-50 border-orange-200'
-                  : 'bg-gray-50 border-gray-200'
-              } border rounded-lg p-4`}>
-                <div className={`text-sm font-medium mb-1 ${
-                  weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
-                    ? 'text-purple-700'
-                    : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
-                    ? 'text-orange-700'
-                    : 'text-gray-700'
-                }`}>
-                  Total Change
+                  ? 'bg-gradient-to-br from-orange-50 via-amber-50 to-orange-50 border-orange-200/50'
+                  : 'bg-gradient-to-br from-gray-50 via-slate-50 to-gray-50 border-gray-200/50'
+              }`}>
+                {/* Glassy overlay */}
+                <div className="absolute inset-0 bg-white/40 backdrop-blur-sm"></div>
+
+                {/* Content */}
+                <div className="relative z-10">
+                  <div className={`text-sm font-bold mb-2 tracking-wide uppercase ${
+                    weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                      ? 'text-purple-700'
+                      : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                      ? 'text-orange-700'
+                      : 'text-gray-700'
+                  }`}>
+                    Total Change
+                  </div>
+                  <div className={`text-3xl font-bold mb-1 ${
+                    weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                      ? 'text-purple-900'
+                      : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                      ? 'text-orange-900'
+                      : 'text-gray-900'
+                  }`}>
+                    {weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0 ? '-' : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0 ? '+' : ''}
+                    {Math.abs(weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg).toFixed(1)} <span className={`text-xl ${
+                      weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                        ? 'text-purple-700'
+                        : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                        ? 'text-orange-700'
+                        : 'text-gray-700'
+                    }`}>kg</span>
+                  </div>
+                  <div className={`text-xs font-semibold ${
+                    weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                      ? 'text-purple-600'
+                      : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                      ? 'text-orange-600'
+                      : 'text-gray-600'
+                  }`}>
+                    {weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
+                      ? '📉 Lost'
+                      : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
+                      ? '📈 Gained'
+                      : 'No change'}
+                  </div>
                 </div>
-                <div className={`text-2xl font-bold ${
+
+                {/* Decorative element */}
+                <div className={`absolute -bottom-2 -right-2 w-20 h-20 rounded-full blur-2xl group-hover:scale-110 transition-transform duration-300 ${
                   weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
-                    ? 'text-purple-900'
+                    ? 'bg-purple-200/30'
                     : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
-                    ? 'text-orange-900'
-                    : 'text-gray-900'
-                }`}>
-                  {weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0 ? '-' : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0 ? '+' : ''}
-                  {Math.abs(weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg).toFixed(1)} kg
-                </div>
-                <div className={`text-xs mt-1 ${
-                  weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
-                    ? 'text-purple-600'
-                    : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
-                    ? 'text-orange-600'
-                    : 'text-gray-600'
-                }`}>
-                  {weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg > 0
-                    ? '📉 Lost'
-                    : weightTracking[0].weight_kg - weightTracking[weightTracking.length - 1].weight_kg < 0
-                    ? '📈 Gained'
-                    : 'No change'}
-                </div>
+                    ? 'bg-orange-200/30'
+                    : 'bg-gray-200/30'
+                }`}></div>
               </div>
             </div>
 
@@ -906,34 +1055,37 @@ const Progress = () => {
               const weekCompletion = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0
 
               return (
-                <div key={week.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div key={week.id} className="bg-white rounded-2xl shadow-lg border-2 border-emerald-200 overflow-hidden hover:shadow-xl transition-all duration-300">
                   {/* Week Header - Clickable */}
                   <button
                     onClick={() => toggleWeekExpanded(week.id)}
-                    className="w-full bg-gradient-to-r from-primary-500 to-primary-600 px-4 md:px-6 py-4 hover:from-primary-600 hover:to-primary-700 transition-all"
+                    className="w-full relative bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 px-5 md:px-6 py-5 hover:shadow-lg transition-all duration-300 group overflow-hidden"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <h2 className="text-xl font-bold text-white">
-                          📅 Week {week.week_number}
+                    {/* Glassy overlay */}
+                    <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+
+                    <div className="relative z-10 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+                          Week {week.week_number}
                         </h2>
-                        <span className="text-sm text-white/90 bg-white/20 px-3 py-1 rounded-full">
+                        <span className="text-sm text-white font-semibold bg-white/25 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/30 shadow-sm">
                           {completedDays}/{totalDays} days
                         </span>
                       </div>
                       <div className="flex items-center gap-3">
                         {/* Completion Progress */}
-                        <div className="hidden sm:flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full">
-                          <span className="text-sm text-white font-medium">{weekCompletion}%</span>
+                        <div className="hidden sm:flex items-center gap-2 bg-white/25 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/30 shadow-sm">
+                          <span className="text-sm text-white font-bold">{weekCompletion}%</span>
                         </div>
                         {/* Dropdown Arrow */}
                         <svg
-                          className={`w-6 h-6 text-white transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                          className={`w-6 h-6 text-white transition-all duration-300 ease-in-out group-hover:scale-110 ${isExpanded ? 'rotate-180' : ''}`}
                           fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
                         >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
                     </div>
@@ -941,7 +1093,7 @@ const Progress = () => {
 
                   {/* Days - Collapsible */}
                   {isExpanded && (
-                    <div className="p-4 md:p-6 space-y-4">
+                    <div className="p-4 md:p-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                   {week.days.map(day => {
                     const typeInfo = getWorkoutTypeInfo(day.workout_type)
                     const completionPercentage = getCompletionPercentage(day)
@@ -950,17 +1102,17 @@ const Progress = () => {
                     return (
                       <div
                         key={day.id}
-                        className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+                        className="border-2 border-gray-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300"
                       >
-                        <div className={`p-4 ${isCompleted ? 'bg-green-50' : 'bg-gray-50'}`}>
+                        <div className={`p-5 ${isCompleted ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50' : 'bg-white'}`}>
                           {/* Day Header */}
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                             <div className="flex items-center gap-3">
-                              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border ${typeInfo.color}`}>
+                              <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold border-2 shadow-sm ${typeInfo.color}`}>
                                 {typeInfo.emoji} {DAYS_OF_WEEK[day.day_of_week]}
                               </span>
                               {isCompleted && (
-                                <span className="inline-flex items-center gap-1 text-green-600 text-sm font-medium">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold border border-emerald-300">
                                   ✅ Completed
                                 </span>
                               )}
@@ -968,7 +1120,7 @@ const Progress = () => {
                             {!isCoach && (
                               <button
                                 onClick={() => openLogModal(week, day)}
-                                className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 text-sm font-bold"
                               >
                                 {day.completion ? '✏️ Update Log' : '➕ Log Workout'}
                               </button>

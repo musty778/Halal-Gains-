@@ -125,179 +125,203 @@ const Coaches = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">My Coach</h1>
-          <p className="text-gray-600">Your assigned fitness coach</p>
+        <div className="mb-8">
+          <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+            My Coach
+          </h1>
+          <p className="text-gray-600 text-lg">Your assigned fitness coach</p>
         </div>
 
         {/* Coach Card */}
-        <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden max-w-4xl">
-          {/* Coach Header with Photo */}
-          <div className="md:flex">
-            {/* Photo Section */}
-            <div className="md:w-1/3">
-              {coach.profile_photos && coach.profile_photos.length > 0 ? (
-                <img
-                  src={coach.profile_photos[0]}
-                  alt={coach.full_name}
-                  className="w-full h-64 md:h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-64 md:h-full bg-gray-100 flex items-center justify-center text-6xl text-gray-300">
-                  👤
-                </div>
-              )}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden max-w-md mx-auto">
+          {/* Gradient Header */}
+          <div className="h-32 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 relative">
+            {/* Availability Badge */}
+            {coach.availability_type && (
+              <span className={`absolute top-3 right-3 px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-sm ${
+                coach.availability_type === 'online_only'
+                  ? 'bg-blue-100/90 text-blue-700'
+                  : coach.availability_type === 'in_person'
+                  ? 'bg-green-100/90 text-green-700'
+                  : 'bg-purple-100/90 text-purple-700'
+              }`}>
+                {coach.availability_type === 'online_only' ? '💻 Online' :
+                 coach.availability_type === 'in_person' ? '🏋️ In-Person' : '🌐 Both'}
+              </span>
+            )}
+          </div>
+
+          {/* Coach Info */}
+          <div className="px-6 pb-6">
+            {/* Profile Photo - Overlapping gradient */}
+            <div className="flex justify-center -mt-16 mb-3">
+              <div className="relative">
+                {coach.profile_photos && coach.profile_photos.length > 0 ? (
+                  <img
+                    src={coach.profile_photos[0]}
+                    alt={coach.full_name}
+                    className="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-xl"
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-2xl bg-gray-100 border-4 border-white shadow-xl flex items-center justify-center text-5xl text-gray-300">
+                    👤
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Info Section */}
-            <div className="md:w-2/3 p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900 mb-1">{coach.full_name}</h2>
-                  {coach.location && (
-                    <p className="text-gray-500 flex items-center gap-1">
-                      <span>📍</span> {coach.location}
-                    </p>
-                  )}
-                </div>
-                {coach.availability_type && (
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    coach.availability_type === 'online_only'
-                      ? 'bg-blue-100 text-blue-700'
-                      : coach.availability_type === 'in_person'
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-purple-100 text-purple-700'
-                  }`}>
-                    {coach.availability_type === 'online_only' ? '💻 Online' :
-                     coach.availability_type === 'in_person' ? '🏋️ In-Person' : '🌐 Both'}
+            {/* Coach Name */}
+            <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">
+              {coach.full_name}
+            </h2>
+
+            {/* New Coach Badge or Status */}
+            <div className="text-center mb-4">
+              <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
+                New Coach
+              </span>
+            </div>
+
+            {/* Specializations Pills */}
+            {coach.specialisations && coach.specialisations.length > 0 && (
+              <div className="flex flex-wrap gap-2 justify-center mb-4">
+                {coach.specialisations.slice(0, 2).map((spec) => (
+                  <span
+                    key={spec}
+                    className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium"
+                  >
+                    {SPECIALISATION_LABELS[spec] || spec}
+                  </span>
+                ))}
+                {coach.specialisations.length > 2 && (
+                  <span className="px-3 py-1.5 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">
+                    +{coach.specialisations.length - 2}
                   </span>
                 )}
               </div>
+            )}
 
-              {/* Experience & Rate */}
-              <div className="flex gap-4 mb-4 pb-4 border-b border-gray-200">
+            {/* Bio */}
+            {coach.bio && (
+              <p className="text-sm text-gray-600 text-center mb-6 leading-relaxed line-clamp-2">
+                {coach.bio}
+              </p>
+            )}
+
+            {/* Price */}
+            <div className="mb-4">
+              <p className="text-sm text-gray-500 text-center mb-1">Starting at</p>
+              <div className="text-center">
+                {coach.hourly_rate ? (
+                  <span className="text-3xl font-bold text-gray-900">
+                    ${coach.hourly_rate}<span className="text-base text-gray-500 font-normal">/hr</span>
+                  </span>
+                ) : (
+                  <span className="text-base text-gray-500">Contact for pricing</span>
+                )}
+              </div>
+            </div>
+
+            {/* View Profile Button */}
+            <button
+              onClick={() => navigate(`/coach/${coach.id}`)}
+              className="w-full py-3 px-4 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-all text-base shadow-md hover:shadow-lg"
+            >
+              View Profile
+            </button>
+
+            {/* Location & Experience */}
+            {(coach.location || coach.years_of_experience) && (
+              <div className="flex items-center justify-center gap-4 mt-4 text-xs text-gray-500">
+                {coach.location && (
+                  <span className="flex items-center gap-1">
+                    <span>📍</span> {coach.location}
+                  </span>
+                )}
                 {coach.years_of_experience && (
-                  <div>
-                    <p className="text-sm text-gray-500">Experience</p>
-                    <p className="font-semibold text-gray-900">{coach.years_of_experience} years</p>
-                  </div>
-                )}
-                {coach.hourly_rate && (
-                  <div>
-                    <p className="text-sm text-gray-500">Hourly Rate</p>
-                    <p className="font-semibold text-gray-900">${coach.hourly_rate}/hr</p>
-                  </div>
+                  <span>
+                    {coach.years_of_experience} yr{coach.years_of_experience !== 1 ? 's' : ''} exp
+                  </span>
                 )}
               </div>
+            )}
 
-              {/* Specializations */}
-              {coach.specialisations && coach.specialisations.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Specializations</p>
-                  <div className="flex flex-wrap gap-2">
-                    {coach.specialisations.map((spec) => (
-                      <span
-                        key={spec}
-                        className="px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
-                      >
-                        {SPECIALISATION_LABELS[spec] || spec}
-                      </span>
-                    ))}
-                  </div>
+            {/* Certifications */}
+            {coach.certifications && coach.certifications.length > 0 && (
+              <div className="mt-6 border-t border-gray-100 pt-6">
+                <p className="text-sm font-semibold text-gray-700 mb-3 text-center">Certifications</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {coach.certifications.map((cert, index) => {
+                    // Check if cert is a URL (image)
+                    const isUrl = cert.startsWith('http://') || cert.startsWith('https://')
+
+                    if (isUrl) {
+                      return (
+                        <a
+                          key={index}
+                          href={cert}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="relative group overflow-hidden rounded-lg border-2 border-gray-200 hover:border-emerald-500 transition-all"
+                        >
+                          <img
+                            src={cert}
+                            alt={`Certification ${index + 1}`}
+                            className="w-full h-32 object-cover group-hover:scale-105 transition-transform"
+                          />
+                          <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity flex items-center justify-center">
+                            <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity text-sm font-medium">
+                              View Full Size
+                            </span>
+                          </div>
+                        </a>
+                      )
+                    } else {
+                      return (
+                        <span
+                          key={index}
+                          className="px-3 py-2 bg-gray-50 text-gray-700 rounded-lg text-sm flex items-center gap-2"
+                        >
+                          <span>🏆</span>
+                          <span className="truncate">{cert}</span>
+                        </span>
+                      )
+                    }
+                  })}
                 </div>
-              )}
-
-              {/* Certifications */}
-              {coach.certifications && coach.certifications.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Certifications</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    {coach.certifications.map((cert, index) => {
-                      // Check if cert is a URL (image)
-                      const isUrl = cert.startsWith('http://') || cert.startsWith('https://')
-
-                      if (isUrl) {
-                        return (
-                          <a
-                            key={index}
-                            href={cert}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="relative group overflow-hidden rounded-lg border-2 border-gray-200 hover:border-primary-500 transition-all"
-                          >
-                            <img
-                              src={cert}
-                              alt={`Certification ${index + 1}`}
-                              className="w-full h-32 object-cover group-hover:scale-105 transition-transform"
-                            />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity flex items-center justify-center">
-                              <span className="text-white opacity-0 group-hover:opacity-100 transition-opacity text-sm font-medium">
-                                View Full Size
-                              </span>
-                            </div>
-                          </a>
-                        )
-                      } else {
-                        return (
-                          <span
-                            key={index}
-                            className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm flex items-center gap-2"
-                          >
-                            <span>🏆</span>
-                            <span className="truncate">{cert}</span>
-                          </span>
-                        )
-                      }
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Bio */}
-              {coach.bio && (
-                <div className="mb-4">
-                  <p className="text-sm font-medium text-gray-700 mb-1">About</p>
-                  <p className="text-gray-600 text-sm leading-relaxed">{coach.bio}</p>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => navigate(`/chat?coach_id=${coach.id}`)}
-                  className="flex-1 py-2.5 px-4 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-all"
-                >
-                  💬 Message Coach
-                </button>
-                <button
-                  onClick={() => navigate(`/coach/${coach.id}`)}
-                  className="py-2.5 px-4 border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:border-gray-400 transition-all"
-                >
-                  View Full Profile
-                </button>
               </div>
+            )}
+
+            {/* Training Philosophy */}
+            {coach.training_philosophy && (
+              <div className="mt-6 border-t border-gray-100 pt-6">
+                <h3 className="font-semibold text-gray-900 mb-2 text-center">Training Philosophy</h3>
+                <p className="text-gray-600 text-sm leading-relaxed text-center">{coach.training_philosophy}</p>
+              </div>
+            )}
+
+            {/* Success Stories */}
+            {coach.success_stories && (
+              <div className="mt-6 border-t border-gray-100 pt-6">
+                <h3 className="font-semibold text-gray-900 mb-2 text-center">Success Stories</h3>
+                <p className="text-gray-600 text-sm leading-relaxed text-center">{coach.success_stories}</p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 mt-4 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => navigate(`/chat?coach_id=${coach.id}`)}
+                className="flex-1 py-2.5 px-4 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-all shadow-sm hover:shadow-md text-sm"
+              >
+                💬 Message Coach
+              </button>
             </div>
           </div>
-
-          {/* Training Philosophy (if available) */}
-          {coach.training_philosophy && (
-            <div className="border-t border-gray-200 p-6 bg-gray-50">
-              <h3 className="font-semibold text-gray-900 mb-2">Training Philosophy</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">{coach.training_philosophy}</p>
-            </div>
-          )}
-
-          {/* Success Stories (if available) */}
-          {coach.success_stories && (
-            <div className="border-t border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-2">Success Stories</h3>
-              <p className="text-gray-600 text-sm leading-relaxed">{coach.success_stories}</p>
-            </div>
-          )}
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl">
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto">
           <button
             onClick={() => navigate('/meal-plans')}
             className="p-4 bg-white rounded-lg border-2 border-gray-200 hover:border-primary-500 transition-all text-left"

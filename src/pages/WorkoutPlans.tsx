@@ -360,10 +360,16 @@ const WorkoutPlans = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">💪 My Workout Plans</h1>
+          {/* Beautiful Gradient Title */}
+          <div className="mb-8">
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+              My Workout Plans
+            </h1>
+            <p className="text-gray-600 text-lg">Your personalized training programs</p>
+          </div>
 
           {workoutPlans.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center max-w-md mx-auto">
               <div className="text-4xl mb-3">🏋️</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Workout Plans Yet</h3>
               <p className="text-gray-600">
@@ -371,7 +377,7 @@ const WorkoutPlans = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {workoutPlans.map((plan) => {
                 const goalInfo = getGoalInfo(plan.goal)
                 const difficultyInfo = getDifficultyInfo(plan.difficulty)
@@ -380,18 +386,23 @@ const WorkoutPlans = () => {
                   <div
                     key={plan.id}
                     onClick={() => navigate(`/workout-plan/${plan.id}`)}
-                    className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
+                    className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer group"
+                    style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
                   >
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900 flex-1">{plan.name}</h3>
+                    {/* Gradient Header */}
+                    <div className="relative h-40 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 overflow-hidden">
+                      {/* Glassy overlay */}
+                      <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+
+                      {/* Completion Badge in top right */}
                       {plan.total_weeks && plan.total_weeks > 0 && (
-                        <div className="ml-2">
+                        <div className="absolute top-3 right-3">
                           {plan.completed_weeks === plan.total_weeks ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-white/30 backdrop-blur-md text-white border border-white/30">
                               ✓ Complete
                             </span>
                           ) : plan.completed_weeks && plan.completed_weeks > 0 ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold bg-white/30 backdrop-blur-md text-white border border-white/30">
                               {plan.completed_weeks}/{plan.total_weeks} weeks
                             </span>
                           ) : null}
@@ -399,20 +410,46 @@ const WorkoutPlans = () => {
                       )}
                     </div>
 
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <span>⏱️</span>
-                        <span>{plan.duration}</span>
+                    {/* Card Content */}
+                    <div className="px-6 pb-6 -mt-12">
+                      {/* Icon Circle - overlapping the gradient */}
+                      <div className="flex justify-center mb-4">
+                        <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-xl flex items-center justify-center text-4xl relative z-10">
+                          💪
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <span>{goalInfo.emoji}</span>
-                        <span>{goalInfo.label}</span>
+
+                      {/* Plan Name */}
+                      <h3 className="text-xl font-bold text-gray-900 text-center mb-3 group-hover:text-emerald-600 transition-colors">
+                        {plan.name}
+                      </h3>
+
+                      {/* Plan Details */}
+                      <div className="space-y-3 mb-4">
+                        {/* Duration */}
+                        <div className="flex items-center justify-center gap-2 text-gray-700">
+                          <span className="text-lg">⏱️</span>
+                          <span className="font-semibold">{plan.duration}</span>
+                        </div>
+
+                        {/* Goal */}
+                        <div className="flex items-center justify-center gap-2 text-gray-700">
+                          <span className="text-lg">{goalInfo.emoji}</span>
+                          <span className="font-semibold">{goalInfo.label}</span>
+                        </div>
+
+                        {/* Difficulty */}
+                        <div className="flex justify-center">
+                          <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold ${difficultyInfo.color}`}>
+                            {difficultyInfo.emoji} {difficultyInfo.label}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${difficultyInfo.color}`}>
-                          {difficultyInfo.emoji} {difficultyInfo.label}
-                        </span>
-                      </div>
+
+                      {/* View Button */}
+                      <button className="w-full py-3 px-4 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-all text-base shadow-md hover:shadow-lg group-hover:scale-105 transform duration-300">
+                        View Plan
+                      </button>
                     </div>
                   </div>
                 )

@@ -763,50 +763,56 @@ const MealPlanDetail = () => {
 
         <div className="max-w-5xl mx-auto">
           {/* Main Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-            {/* Header Section */}
-            <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6 text-white">
-              <div className="flex items-start justify-between mb-2">
-                <h1 className="text-2xl md:text-3xl font-bold">{mealPlan.name}</h1>
-                {mealPlan.ramadan_mode && (
-                  <span className="text-3xl">🌙</span>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden mb-6">
+            {/* Header Section with Glassy Effect */}
+            <div className="relative bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 p-8 overflow-hidden">
+              {/* Glassy overlay */}
+              <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+
+              {/* Content */}
+              <div className="relative z-10">
+                <div className="flex items-start justify-between mb-3">
+                  <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">{mealPlan.name}</h1>
+                  {mealPlan.ramadan_mode && (
+                    <span className="text-4xl">🌙</span>
+                  )}
+                </div>
+                {mealPlan.description && (
+                  <p className="text-white/95 mb-4 text-lg font-medium">{mealPlan.description}</p>
                 )}
-              </div>
-              {mealPlan.description && (
-                <p className="text-white/90 mb-3">{mealPlan.description}</p>
-              )}
-              <div className="flex flex-wrap items-center gap-3">
-                {mealPlan.calories_target && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
-                    🔥 {mealPlan.calories_target} cal/day
-                  </span>
-                )}
-                {mealPlan.protein_target_g && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
-                    💪 {mealPlan.protein_target_g}g protein
-                  </span>
-                )}
-                {mealPlan.carbs_target_g && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
-                    🍞 {mealPlan.carbs_target_g}g carbs
-                  </span>
-                )}
-                {mealPlan.fats_target_g && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
-                    🥑 {mealPlan.fats_target_g}g fats
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {mealPlan.calories_target && (
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/25 backdrop-blur-md rounded-full text-sm font-semibold text-white shadow-sm border border-white/30">
+                      🔥 {mealPlan.calories_target} cal/day
+                    </span>
+                  )}
+                  {mealPlan.protein_target_g && (
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/25 backdrop-blur-md rounded-full text-sm font-semibold text-white shadow-sm border border-white/30">
+                      💪 {mealPlan.protein_target_g}g protein
+                    </span>
+                  )}
+                  {mealPlan.carbs_target_g && (
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/25 backdrop-blur-md rounded-full text-sm font-semibold text-white shadow-sm border border-white/30">
+                      🍞 {mealPlan.carbs_target_g}g carbs
+                    </span>
+                  )}
+                  {mealPlan.fats_target_g && (
+                    <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/25 backdrop-blur-md rounded-full text-sm font-semibold text-white shadow-sm border border-white/30">
+                      🥑 {mealPlan.fats_target_g}g fats
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
             {/* Coach Section */}
             {coachInfo && (
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Your Coach
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">
+                  YOUR COACH
                 </h2>
                 <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
                     {coachInfo.profile_photos && coachInfo.profile_photos.length > 0 ? (
                       <img
                         src={coachInfo.profile_photos[0]}
@@ -818,11 +824,11 @@ const MealPlanDetail = () => {
                     )}
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">
                       {coachInfo.full_name}
                     </h3>
                     {coachInfo.bio && (
-                      <p className="text-sm text-gray-700 leading-relaxed">
+                      <p className="text-sm text-gray-600 leading-relaxed">
                         {coachInfo.bio}
                       </p>
                     )}
@@ -833,13 +839,16 @@ const MealPlanDetail = () => {
           </div>
 
           {/* Weekly Breakdown Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">📅 Weekly Breakdown</h2>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <span className="text-2xl">📅</span>
+                <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Weekly Breakdown</span>
+              </h2>
               {isCoach && coachInfo?.user_id === currentUserId && (
                 <button
                   onClick={openAddDayModal}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 text-sm font-semibold"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -869,45 +878,49 @@ const MealPlanDetail = () => {
                     const hasMultipleWeeks = weekNumbers.length > 1
 
                     return (
-                      <div key={weekNumber} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div key={weekNumber} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
                         {/* Week Header */}
-                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                        <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-5 py-4 border-b border-gray-200 flex items-center justify-between">
                           <div className="flex items-center gap-3">
                             {hasMultipleWeeks && (
                               <button
                                 onClick={() => setExpandedWeekNumber(isWeekExpanded ? null : weekNumber)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-gray-400 hover:text-emerald-600 transition-all duration-300 hover:scale-110"
                               >
                                 <svg
-                                  className={`w-5 h-5 transition-transform ${isWeekExpanded ? 'rotate-90' : ''}`}
+                                  className={`w-5 h-5 transition-all duration-300 ease-in-out ${isWeekExpanded ? 'rotate-90' : ''}`}
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
                                 >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                 </svg>
                               </button>
                             )}
-                            <h3 className="font-semibold text-gray-900">Week {weekNumber}</h3>
+                            <h3 className="font-bold text-gray-900 text-lg">Week {weekNumber}</h3>
+                          </div>
+
+                          {/* Right side - Completion buttons */}
+                          <div>
                             {!isCoach && weekCompleted && !getWeekCompletion(weekNumber) && (
                               <button
                                 onClick={() => handleCompleteWeek(weekNumber, weekDays)}
-                                className="px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center gap-2"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Complete Week
                               </button>
                             )}
                             {!isCoach && getWeekCompletion(weekNumber) && (
-                              <div className="px-4 py-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold rounded-lg flex items-center gap-2 shadow-md">
+                              <div className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold rounded-xl flex items-center gap-2 shadow-lg">
                                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <span>Completed ✓</span>
                                 {getWeekCompletion(weekNumber)?.weight_kg && (
-                                  <span className="ml-2 text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                                  <span className="ml-2 text-xs bg-white/30 backdrop-blur-sm px-2.5 py-1 rounded-full font-semibold">
                                     {getWeekCompletion(weekNumber)?.weight_kg}kg
                                   </span>
                                 )}
@@ -918,46 +931,46 @@ const MealPlanDetail = () => {
 
                         {/* Days in Week */}
                         {(isWeekExpanded || !hasMultipleWeeks) && (
-                          <div className="divide-y divide-gray-200">
+                          <div className="divide-y divide-gray-100">
                             {weekDays.map((day) => {
                               const dayTotals = calculateDayTotals(day.meals)
                               const isExpanded = expandedDayId === day.id
                               const hasMultipleDaysInWeek = weekDays.length > 1
 
                               return (
-                                <div key={day.id}>
+                                <div key={day.id} className="transition-all duration-300">
                                   {/* Day Header */}
-                                  <div className="px-4 py-3 border-b border-gray-200">
+                                  <div className="px-5 py-4 bg-white hover:bg-gray-50 transition-all duration-200">
                                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                                       <div className="flex items-center gap-3 flex-1">
                                         {hasMultipleDaysInWeek && (
                                           <button
                                             onClick={() => setExpandedDayId(isExpanded ? null : day.id)}
-                                            className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                            className="p-1.5 hover:bg-emerald-100 rounded-lg transition-all duration-300 hover:scale-110"
                                           >
                                             <svg
-                                              className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
+                                              className={`w-5 h-5 text-gray-400 hover:text-emerald-600 transition-all duration-300 ease-in-out flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
                                               fill="none"
                                               stroke="currentColor"
                                               viewBox="0 0 24 24"
                                             >
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                                             </svg>
                                           </button>
                                         )}
                                         <div className="flex-1">
                                           <div className="flex items-center gap-3 mb-2">
-                                            <h3 className="font-bold text-gray-900 text-lg">
+                                            <h3 className="font-bold text-gray-900 text-base">
                                               Day {day.day_number}
                                               {day.day_name && ` - ${day.day_name}`}
                                             </h3>
                                           </div>
                                           {day.meals.length > 0 && (
-                                            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-600">
-                                              <span>🔥 {dayTotals.calories} cal</span>
-                                              <span>💪 {dayTotals.protein.toFixed(1)}g</span>
-                                              <span>🍞 {dayTotals.carbs.toFixed(1)}g</span>
-                                              <span>🥑 {dayTotals.fats.toFixed(1)}g</span>
+                                            <div className="flex flex-wrap items-center gap-3 text-xs font-medium text-gray-600">
+                                              <span className="flex items-center gap-1">🔥 {dayTotals.calories} cal</span>
+                                              <span className="flex items-center gap-1">💪 {dayTotals.protein.toFixed(1)}g</span>
+                                              <span className="flex items-center gap-1">🍞 {dayTotals.carbs.toFixed(1)}g</span>
+                                              <span className="flex items-center gap-1">🥑 {dayTotals.fats.toFixed(1)}g</span>
                                             </div>
                                           )}
                                         </div>
@@ -966,34 +979,34 @@ const MealPlanDetail = () => {
                                         {!isCoach && (
                                           <div
                                             onClick={() => handleToggleDayCompletion(day)}
-                                            className={`group/pill relative px-4 py-2.5 rounded-xl border-2 transition-all duration-200 cursor-pointer ${
+                                            className={`group/pill relative px-5 py-2.5 rounded-xl border-2 transition-all duration-300 cursor-pointer ${
                                               day.completion
-                                                ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-300/50 shadow-sm'
-                                                : 'bg-white/50 backdrop-blur-sm border-gray-200 hover:border-emerald-300 hover:shadow-md'
+                                                ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-400/60 shadow-md hover:shadow-lg'
+                                                : 'bg-white/60 backdrop-blur-sm border-gray-200 hover:border-emerald-400 hover:shadow-lg hover:scale-105'
                                             }`}
                                           >
                                             <div className="flex items-center gap-2">
                                               {/* Checkbox Circle */}
-                                              <div className={`relative w-5 h-5 rounded-full border-2 flex-shrink-0 transition-all duration-200 ${
+                                              <div className={`relative w-5 h-5 rounded-full border-2 flex-shrink-0 transition-all duration-300 ease-in-out ${
                                                 day.completion
-                                                  ? 'bg-emerald-500 border-emerald-500 scale-110'
-                                                  : 'border-gray-300 group-hover/pill:border-emerald-400'
+                                                  ? 'bg-emerald-500 border-emerald-500 scale-110 shadow-sm'
+                                                  : 'border-gray-300 group-hover/pill:border-emerald-500 group-hover/pill:scale-105'
                                               }`}>
                                                 {day.completion && (
                                                   <svg
-                                                    className="w-full h-full text-white p-0.5"
+                                                    className="w-full h-full text-white p-0.5 animate-in fade-in zoom-in duration-300"
                                                     fill="none"
                                                     stroke="currentColor"
                                                     viewBox="0 0 24 24"
                                                   >
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3.5} d="M5 13l4 4L19 7" />
                                                   </svg>
                                                 )}
                                               </div>
-                                              <span className={`font-semibold text-sm transition-all duration-200 ${
+                                              <span className={`font-bold text-sm transition-all duration-300 ${
                                                 day.completion
                                                   ? 'text-emerald-700'
-                                                  : 'text-gray-800 group-hover/pill:text-gray-900'
+                                                  : 'text-gray-700 group-hover/pill:text-emerald-600'
                                               }`}>
                                                 {day.completion ? 'Completed' : 'Mark Complete'}
                                               </span>
@@ -1005,13 +1018,13 @@ const MealPlanDetail = () => {
                                         <div className="flex items-center gap-2">
                                           <button
                                             onClick={() => openAddMealModal(day)}
-                                            className="px-4 py-2 text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
+                                            className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold hover:shadow-lg hover:scale-105 transition-all duration-300"
                                           >
                                             + Add Meal
                                           </button>
                                           <button
                                             onClick={() => handleDeleteDay(day.id)}
-                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hover:scale-110"
                                           >
                                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1032,7 +1045,7 @@ const MealPlanDetail = () => {
                                         No meals added yet
                                       </div>
                                     ) : (
-                                      <div className="divide-y divide-gray-200">
+                                      <div className="divide-y divide-gray-100">
                                         {day.meals.map((meal) => {
                                           const mealTypeInfo = getMealTypeInfo(meal.meal_type)
                                           const mealTotals = calculateMealTotals(meal.foods)
@@ -1107,7 +1120,7 @@ const MealPlanDetail = () => {
                                               ) : (
                                                 <div className="space-y-2 ml-7">
                                                   {meal.foods.map((food, idx) => (
-                                                    <div key={food.id} className="bg-gray-50 rounded-lg p-3">
+                                                    <div key={food.id} className="bg-gradient-to-r from-gray-50 to-gray-100/50 rounded-xl p-3 border border-gray-100 hover:border-emerald-200 transition-all duration-200">
                                                       <div className="flex items-start justify-between">
                                                         <div className="flex-1">
                                                           <div className="flex items-center gap-2 mb-1">

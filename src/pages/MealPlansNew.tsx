@@ -299,10 +299,16 @@ const MealPlansNew = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">🍽️ My Meal Plans</h1>
+          {/* Beautiful Gradient Title */}
+          <div className="mb-8">
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+              My Meal Plans
+            </h1>
+            <p className="text-gray-600 text-lg">Your personalized nutrition plans</p>
+          </div>
 
           {mealPlans.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center max-w-md mx-auto">
               <div className="text-4xl mb-3">🥗</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">No Meal Plans Yet</h3>
               <p className="text-gray-600">
@@ -310,38 +316,74 @@ const MealPlansNew = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {mealPlans.map((plan) => (
                 <div
                   key={plan.id}
                   onClick={() => navigate(`/meal-plan/${plan.id}`)}
-                  className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
+                  className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden hover:shadow-2xl transition-all duration-300 cursor-pointer group"
+                  style={{ boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900 flex-1">{plan.name}</h3>
-                    {plan.ramadan_mode && (
-                      <span className="text-xl">🌙</span>
-                    )}
+                  {/* Gradient Header */}
+                  <div className="relative h-40 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 overflow-hidden">
+                    {/* Glassy overlay */}
+                    <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
                   </div>
 
-                  {plan.description && (
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">{plan.description}</p>
-                  )}
+                  {/* Card Content */}
+                  <div className="px-6 pb-6 -mt-12">
+                    {/* Icon Circle - overlapping the gradient */}
+                    <div className="flex justify-center mb-4">
+                      <div className="w-20 h-20 rounded-2xl bg-white border-4 border-white shadow-xl flex items-center justify-center text-4xl relative z-10">
+                        🍽️
+                      </div>
+                    </div>
 
-                  <div className="space-y-2 text-sm">
-                    {plan.calories_target && (
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <span>🔥</span>
-                        <span>{plan.calories_target} calories/day</span>
-                      </div>
+                    {/* Plan Name */}
+                    <h3 className="text-xl font-bold text-gray-900 text-center mb-2 group-hover:text-emerald-600 transition-colors">
+                      {plan.name}
+                    </h3>
+
+                    {/* Description */}
+                    {plan.description && (
+                      <p className="text-sm text-gray-600 text-center mb-4 line-clamp-2 min-h-[2.5rem]">
+                        {plan.description}
+                      </p>
                     )}
-                    {(plan.protein_target_g || plan.carbs_target_g || plan.fats_target_g) && (
-                      <div className="flex flex-wrap items-center gap-3 text-gray-600">
-                        {plan.protein_target_g && <span>💪 {plan.protein_target_g}g protein</span>}
-                        {plan.carbs_target_g && <span>🍞 {plan.carbs_target_g}g carbs</span>}
-                        {plan.fats_target_g && <span>🥑 {plan.fats_target_g}g fats</span>}
-                      </div>
-                    )}
+
+                    {/* Nutrition Info */}
+                    <div className="space-y-3 mb-4">
+                      {plan.calories_target && (
+                        <div className="flex items-center justify-center gap-2 text-gray-700">
+                          <span className="text-lg">🔥</span>
+                          <span className="font-semibold">{plan.calories_target} calories/day</span>
+                        </div>
+                      )}
+                      {(plan.protein_target_g || plan.carbs_target_g || plan.fats_target_g) && (
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          {plan.protein_target_g && (
+                            <span className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-sm font-medium">
+                              💪 {plan.protein_target_g}g protein
+                            </span>
+                          )}
+                          {plan.carbs_target_g && (
+                            <span className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full text-sm font-medium">
+                              🍞 {plan.carbs_target_g}g carbs
+                            </span>
+                          )}
+                          {plan.fats_target_g && (
+                            <span className="px-3 py-1.5 bg-amber-50 text-amber-700 rounded-full text-sm font-medium">
+                              🥑 {plan.fats_target_g}g fats
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* View Button */}
+                    <button className="w-full py-3 px-4 bg-gray-900 text-white rounded-xl font-semibold hover:bg-gray-800 transition-all text-base shadow-md hover:shadow-lg group-hover:scale-105 transform duration-300">
+                      View Plan
+                    </button>
                   </div>
                 </div>
               ))}
