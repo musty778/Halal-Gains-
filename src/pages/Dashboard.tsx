@@ -713,24 +713,15 @@ const Dashboard = () => {
     }
   }, [currentUserId, weekMealPlanDays, fetchMealPlan, togglingMealDay])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30 flex items-center justify-center">
-        <div className="relative">
-          <div className="w-16 h-16 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
-          <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-purple-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
-        </div>
-      </div>
-    )
-  }
+  // Removed blocking loading screen for faster page transitions
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header with Greeting */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 bg-clip-text text-transparent mb-2">
-            As-salamu alaykum, {clientName || 'there'}! 👋
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+            Salamu Alaykum, {clientName || 'there'}!
           </h1>
           <p className="text-gray-600 text-lg">
             Focus on your health, strengthen your deen.

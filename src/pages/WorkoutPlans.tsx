@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface WorkoutPlan {
   id: string
@@ -77,6 +78,10 @@ const WorkoutPlans = () => {
   useEffect(() => {
     const fetchWorkoutPlans = async () => {
       if (!currentUserId) return
+
+      // Reset state to prevent flash of old content
+      setWorkoutPlans([])
+      setLoading(true)
 
       const { data, error } = await supabase
         .from('workout_plans')
@@ -347,12 +352,9 @@ const WorkoutPlans = () => {
     }
   }
 
+  // Show beautiful loading indicator while fetching to prevent flash of old content
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500"></div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   // Client view

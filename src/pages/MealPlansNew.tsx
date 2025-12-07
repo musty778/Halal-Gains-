@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { useRamadan } from '../contexts/RamadanContext'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface MealPlan {
   id: string
@@ -18,6 +19,7 @@ interface MealPlan {
   updated_at: string
   client_name?: string
   client_photo?: string
+  has_completions?: boolean
 }
 
 interface Client {
@@ -84,29 +86,56 @@ const MealPlansNew = () => {
     const fetchMealPlans = async () => {
       if (!currentUserId) return
 
+      // Reset state to prevent flash of old content
+      setMealPlans([])
+      setLoading(true)
+
       const { data, error } = await supabase
         .from('meal_plans')
         .select('*')
         .order('created_at', { ascending: false })
 
       if (!error && data) {
-        // Get client names and photos for assigned plans
+        // Get client names, photos, and completion data for assigned plans
         const plansWithClientInfo = await Promise.all(
           data.map(async (plan) => {
-            if (plan.client_id) {
-              const { data: clientData } = await supabase
-                .from('client_profiles')
-                .select('full_name, profile_photo')
-                .eq('user_id', plan.client_id)
-                .single()
+            const promises = []
 
-              return {
-                ...plan,
-                client_name: clientData?.full_name || 'Unknown Client',
-                client_photo: clientData?.profile_photo
-              }
+            // Fetch client data if assigned
+            if (plan.client_id) {
+              promises.push(
+                supabase
+                  .from('client_profiles')
+                  .select('full_name, profile_photo')
+                  .eq('user_id', plan.client_id)
+                  .single()
+              )
+            } else {
+              promises.push(Promise.resolve({ data: null }))
             }
-            return plan
+
+            // Fetch completion data for client view
+            if (!isCoach && plan.client_id === currentUserId) {
+              promises.push(
+                supabase
+                  .from('meal_plan_week_completions')
+                  .select('id')
+                  .eq('meal_plan_id', plan.id)
+                  .eq('user_id', currentUserId)
+                  .limit(1)
+              )
+            } else {
+              promises.push(Promise.resolve({ data: null }))
+            }
+
+            const [clientResult, completionsResult] = await Promise.all(promises)
+
+            return {
+              ...plan,
+              client_name: clientResult.data?.full_name || (plan.client_id ? 'Unknown Client' : undefined),
+              client_photo: clientResult.data?.profile_photo,
+              has_completions: completionsResult.data && completionsResult.data.length > 0
+            }
           })
         )
 
@@ -117,7 +146,7 @@ const MealPlansNew = () => {
     }
 
     fetchMealPlans()
-  }, [currentUserId, coachProfileId])
+  }, [currentUserId, coachProfileId, isCoach])
 
   // Fetch clients (from conversations)
   useEffect(() => {
@@ -286,12 +315,9 @@ const MealPlansNew = () => {
     })
   }
 
+  // Show beautiful loading indicator while fetching to prevent flash of old content
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500"></div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   // Client view
@@ -328,6 +354,18 @@ const MealPlansNew = () => {
                   <div className="relative h-40 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 overflow-hidden">
                     {/* Glassy overlay */}
                     <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+
+                    {/* Completion Badge in top right */}
+                    {plan.has_completions && (
+                      <div className="absolute top-3 right-3">
+                        <div className="px-3 py-1.5 bg-white/30 backdrop-blur-md rounded-full text-xs font-bold text-white shadow-sm border border-white/40 flex items-center gap-1.5">
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>✓ Complete</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Card Content */}

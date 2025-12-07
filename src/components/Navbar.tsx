@@ -157,7 +157,7 @@ const Navbar = () => {
         <div className="flex justify-between items-center py-4">
           {/* Logo */}
           <Link to="/" className={`text-2xl font-bold transition-colors ${
-            ramadanMode ? 'text-yellow-400' : 'text-white'
+            ramadanMode ? 'text-yellow-400' : 'bg-gradient-to-r from-emerald-300 via-teal-300 to-cyan-300 bg-clip-text text-transparent'
           }`}>
             {ramadanMode && <span className="mr-2">🌙</span>}
             Halal Gains

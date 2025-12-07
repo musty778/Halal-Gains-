@@ -13,6 +13,7 @@ import {
   Filler
 } from 'chart.js'
 import { Line } from 'react-chartjs-2'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 // Register ChartJS components
 ChartJS.register(
@@ -201,6 +202,12 @@ const Progress = () => {
     const targetUserId = isCoach ? selectedClientId : currentUserId
     if (!targetUserId) return
 
+    // Reset state to prevent flash of old content
+    setWorkoutPlans([])
+    setSelectedPlanId(null)
+    setWorkoutWeeks([])
+    setLoading(true)
+
     const { data, error } = await supabase
       .from('workout_plans')
       .select('id, name, goal, difficulty')
@@ -215,9 +222,7 @@ const Progress = () => {
       setSelectedPlanId(null)
     }
 
-    if (!isCoach) {
-      setLoading(false)
-    }
+    setLoading(false)
   }
 
   const fetchWorkoutWeeks = async () => {
@@ -675,12 +680,9 @@ const Progress = () => {
     }
   }), [weightTracking])
 
+  // Show beautiful loading indicator while fetching to prevent flash of old content
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500"></div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   // Removed old coach view - now coaches see full progress view below

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { CoachProfile, CoachSpecialisation } from '../types'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 const SPECIALISATION_LABELS: Record<CoachSpecialisation, string> = {
   weight_loss: 'Weight Loss',
@@ -23,6 +24,8 @@ const Coaches = () => {
   useEffect(() => {
     const fetchAssignedCoach = async () => {
       try {
+        // Reset state on mount to prevent flash of old content
+        setCoach(null)
         setLoading(true)
         setError(null)
 
@@ -81,14 +84,9 @@ const Coaches = () => {
     fetchAssignedCoach()
   }, [])
 
+  // Show beautiful loading indicator while fetching to prevent flash of old content
   if (loading) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500"></div>
-        </div>
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   if (error) {

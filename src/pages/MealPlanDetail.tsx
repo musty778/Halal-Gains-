@@ -728,13 +728,7 @@ const MealPlanDetail = () => {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500"></div>
-      </div>
-    )
-  }
+  // Removed blocking loading screen for faster page transitions
 
   if (!mealPlan) {
     return null
@@ -771,10 +765,18 @@ const MealPlanDetail = () => {
 
               {/* Content */}
               <div className="relative z-10">
-                <div className="flex items-start justify-between mb-3">
+                <div className="flex items-start justify-between gap-4 mb-3">
                   <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">{mealPlan.name}</h1>
-                  {mealPlan.ramadan_mode && (
-                    <span className="text-4xl">🌙</span>
+                  {/* Show completed badge if any weeks are completed */}
+                  {!isCoach && weekCompletions.length > 0 && (
+                    <div className="flex-shrink-0">
+                      <div className="px-4 py-2 bg-white/30 backdrop-blur-md rounded-full text-sm font-bold text-white shadow-sm border border-white/40 flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>✓ Complete</span>
+                      </div>
+                    </div>
                   )}
                 </div>
                 {mealPlan.description && (

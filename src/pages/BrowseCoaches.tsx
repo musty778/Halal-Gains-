@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { CoachSpecialisation, Gender, TrainingAvailabilityType } from '../types'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface CoachWithRating {
   id: string
@@ -182,6 +183,11 @@ const BrowseCoaches = () => {
       filters.minPrice > 0 || filters.maxPrice < 500,
     ].filter(Boolean).length
   }, [filters])
+
+  // Show beautiful loading indicator while fetching coaches
+  if (loading) {
+    return <LoadingSpinner />
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

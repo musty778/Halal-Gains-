@@ -573,13 +573,7 @@ const WorkoutPlanDetail = () => {
     setShowWeightModal(true)
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-500"></div>
-      </div>
-    )
-  }
+  // Removed blocking loading screen for faster page transitions
 
   if (!workoutPlan) {
     return null
@@ -604,31 +598,37 @@ const WorkoutPlanDetail = () => {
 
         <div className="max-w-5xl mx-auto">
           {/* Main Card */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-            {/* Header Section */}
-            <div className="bg-gradient-to-r from-primary-500 to-primary-600 p-6 text-white">
-              <h1 className="text-2xl md:text-3xl font-bold mb-2">{workoutPlan.name}</h1>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
-                  ⏱️ {workoutPlan.duration}
-                </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-full text-sm font-medium">
-                  {goalInfo.emoji} {goalInfo.label}
-                </span>
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${difficultyInfo.color}`}>
-                  {difficultyInfo.emoji} {difficultyInfo.label}
-                </span>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden mb-6">
+            {/* Header Section with Glassy Effect */}
+            <div className="relative bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 p-8 overflow-hidden">
+              {/* Glassy overlay */}
+              <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+
+              {/* Content */}
+              <div className="relative z-10">
+                <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-3">{workoutPlan.name}</h1>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/25 backdrop-blur-md rounded-full text-sm font-semibold text-white shadow-sm border border-white/30">
+                    ⏱️ {workoutPlan.duration}
+                  </span>
+                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/25 backdrop-blur-md rounded-full text-sm font-semibold text-white shadow-sm border border-white/30">
+                    {goalInfo.emoji} {goalInfo.label}
+                  </span>
+                  <span className="inline-flex items-center gap-2 px-4 py-2 bg-white/25 backdrop-blur-md rounded-full text-sm font-semibold text-white shadow-sm border border-white/30">
+                    {difficultyInfo.emoji} {difficultyInfo.label}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Coach Section */}
             {coachInfo && (
-              <div className="p-6 border-b border-gray-200">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Your Coach
+              <div className="p-6 border-b border-gray-100">
+                <h2 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">
+                  YOUR COACH
                 </h2>
                 <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
                     {coachInfo.profile_photos && coachInfo.profile_photos.length > 0 ? (
                       <img
                         src={coachInfo.profile_photos[0]}
@@ -640,7 +640,7 @@ const WorkoutPlanDetail = () => {
                     )}
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">
                       {coachInfo.full_name}
                     </h3>
                     {coachInfo.years_of_experience && (
@@ -649,7 +649,7 @@ const WorkoutPlanDetail = () => {
                       </p>
                     )}
                     {coachInfo.bio && (
-                      <p className="text-sm text-gray-700 leading-relaxed">
+                      <p className="text-sm text-gray-600 leading-relaxed">
                         {coachInfo.bio}
                       </p>
                     )}
@@ -660,13 +660,16 @@ const WorkoutPlanDetail = () => {
           </div>
 
           {/* Weekly Breakdown Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">📅 Weekly Breakdown</h2>
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <span className="text-2xl">📅</span>
+                <span className="bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">Weekly Breakdown</span>
+              </h2>
               {isCoach && coachInfo?.user_id === currentUserId && (
                 <button
                   onClick={openAddWeekModal}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 text-sm font-semibold"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -692,54 +695,60 @@ const WorkoutPlanDetail = () => {
                   {workoutWeeks.map((week) => {
                     const weekCompleted = isWeekCompleted(week)
                     return (
-                      <div key={week.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div key={week.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
                         {/* Week Header */}
-                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+                        <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-5 py-4 border-b border-gray-200 flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <h3 className="font-semibold text-gray-900">Week {week.week_number}</h3>
+                            <h3 className="font-bold text-gray-900 text-lg">Week {week.week_number}</h3>
+                          </div>
+
+                          {/* Right side - Completion buttons */}
+                          <div>
                             {!isCoach && weekCompleted && !getWeekCompletion(week.week_number) && (
                               <button
                                 onClick={() => handleCompleteWeek(week)}
-                                className="px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center gap-2"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Complete Week
                               </button>
                             )}
                             {!isCoach && getWeekCompletion(week.week_number) && (
+                              <div className="px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-sm font-bold rounded-xl flex items-center gap-2 shadow-lg">
+                                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Completed ✓</span>
+                                {getWeekCompletion(week.week_number)?.weight_kg && (
+                                  <span className="ml-2 text-xs bg-white/30 backdrop-blur-sm px-2.5 py-1 rounded-full font-semibold">
+                                    {getWeekCompletion(week.week_number)?.weight_kg}kg
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Coach Controls */}
+                          {isCoach && coachInfo?.user_id === currentUserId && (
+                            <div className="flex items-center gap-2">
                               <button
-                                disabled
-                                className="px-4 py-1.5 bg-gray-400 text-white text-sm font-medium rounded-lg cursor-not-allowed flex items-center gap-2"
+                                onClick={() => openAddDayModal(week)}
+                                className="px-4 py-2 text-sm bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold hover:shadow-lg hover:scale-105 transition-all duration-300"
+                              >
+                                Add Day
+                              </button>
+                              <button
+                                onClick={() => handleDeleteWeek(week.id)}
+                                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hover:scale-110"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                 </svg>
-                                Completed
                               </button>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {isCoach && coachInfo?.user_id === currentUserId && (
-                              <>
-                                <button
-                                  onClick={() => openAddDayModal(week)}
-                                  className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
-                                >
-                                  Add Day
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteWeek(week.id)}
-                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
-                              </>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
 
                       {/* Days */}
@@ -748,23 +757,23 @@ const WorkoutPlanDetail = () => {
                           No days added yet
                         </div>
                       ) : (
-                        <div className="divide-y divide-gray-200">
+                        <div className="divide-y divide-gray-100">
                           {week.days.map((day) => {
                             const typeInfo = getWorkoutTypeInfo(day.workout_type)
                             const dayCompleted = isDayCompleted(day)
                             return (
-                              <div key={day.id} className="p-4">
+                              <div key={day.id} className="p-5 bg-white hover:bg-gray-50 transition-all duration-200">
                                 {/* Day Header */}
                                 <div className="flex items-start justify-between mb-3">
-                                  <div className="flex items-center gap-3 flex-wrap">
-                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${typeInfo.color}`}>
+                                  <div className="flex items-center gap-3 flex-wrap flex-1">
+                                    <span className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold ${typeInfo.color} shadow-sm`}>
                                       {typeInfo.emoji} {DAYS_OF_WEEK[day.day_of_week]}
                                     </span>
-                                    <span className="text-sm text-gray-600">{typeInfo.label}</span>
+                                    <span className="text-sm font-semibold text-gray-600">{typeInfo.label}</span>
                                     {isCoach && dayCompleted && (
-                                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-100 text-green-700 rounded-full text-xs font-semibold">
+                                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-400/60 text-emerald-700 rounded-xl text-xs font-bold shadow-sm">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                                         </svg>
                                         Completed
                                       </span>
@@ -776,14 +785,14 @@ const WorkoutPlanDetail = () => {
                                         {day.workout_type !== 'rest' && (
                                           <button
                                             onClick={() => openAddExerciseModal(day)}
-                                            className="px-3 py-1 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                                            className="px-4 py-2 text-xs bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl font-bold hover:shadow-lg hover:scale-105 transition-all duration-300"
                                           >
                                             Add Exercise
                                           </button>
                                         )}
                                         <button
                                           onClick={() => handleDeleteDay(day.id)}
-                                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 hover:scale-110"
                                         >
                                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -796,9 +805,9 @@ const WorkoutPlanDetail = () => {
 
                                 {/* Prayer Time Notes */}
                                 {day.prayer_time_notes && (
-                                  <div className="mb-3 flex items-start gap-2 text-sm text-gray-600 bg-blue-50 p-2 rounded">
-                                    <span>🕌</span>
-                                    <span>{day.prayer_time_notes}</span>
+                                  <div className="mb-3 flex items-start gap-2 text-sm text-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 rounded-xl border border-blue-100">
+                                    <span className="text-lg">🕌</span>
+                                    <span className="font-medium">{day.prayer_time_notes}</span>
                                   </div>
                                 )}
 
@@ -813,21 +822,21 @@ const WorkoutPlanDetail = () => {
                                         const isToggling = togglingExercise === exercise.id
 
                                         return (
-                                          <div key={exercise.id} className={`bg-gray-50 rounded-lg p-3 transition-all ${isCompleted ? 'bg-green-50 border border-green-200' : ''}`}>
+                                          <div key={exercise.id} className={`rounded-xl p-4 transition-all duration-300 ${isCompleted ? 'bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 shadow-sm' : 'bg-gradient-to-r from-gray-50 to-gray-100/50 border border-gray-200 hover:border-emerald-200'}`}>
                                             <div className="flex items-start justify-between gap-3">
                                               {/* Checkbox for clients */}
                                               {!isCoach && (
                                                 <button
                                                   onClick={() => handleToggleExerciseCompletion(exercise.id)}
                                                   disabled={isToggling}
-                                                  className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                                                  className={`flex-shrink-0 mt-0.5 w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-300 ${
                                                     isCompleted
-                                                      ? 'bg-green-500 border-green-500'
-                                                      : 'border-gray-300 hover:border-green-400'
-                                                  } ${isToggling ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 border-emerald-500 scale-110 shadow-md'
+                                                      : 'border-gray-300 hover:border-emerald-400 hover:scale-105'
+                                                  } ${isToggling ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-sm'}`}
                                                 >
                                                   {isCompleted && (
-                                                    <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                                                     </svg>
                                                   )}
@@ -836,17 +845,17 @@ const WorkoutPlanDetail = () => {
 
                                               <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                  <span className={`font-medium ${isCompleted ? 'text-green-700' : 'text-gray-900'}`}>
+                                                  <span className={`font-bold ${isCompleted ? 'text-emerald-700' : 'text-gray-900'}`}>
                                                     {idx + 1}.
                                                   </span>
-                                                  <span className={`font-medium ${isCompleted ? 'text-green-700 line-through' : 'text-gray-900'}`}>
+                                                  <span className={`font-bold text-base ${isCompleted ? 'text-emerald-700 line-through' : 'text-gray-900'}`}>
                                                     {exercise.exercise_name}
                                                   </span>
                                                   {isCompleted && (
-                                                    <span className="text-xs text-green-600 font-medium">✓ Done</span>
+                                                    <span className="text-xs text-emerald-600 font-bold px-2 py-0.5 bg-emerald-100 rounded-full">✓ Done</span>
                                                   )}
                                                 </div>
-                                                <div className={`flex flex-wrap items-center gap-3 text-sm ${isCompleted ? 'text-green-600' : 'text-gray-600'}`}>
+                                                <div className={`flex flex-wrap items-center gap-3 text-sm font-semibold ${isCompleted ? 'text-emerald-600' : 'text-gray-600'}`}>
                                                   {exercise.sets && <span>🔄 {exercise.sets} sets</span>}
                                                   {exercise.reps && <span>🔢 {exercise.reps} reps</span>}
                                                   {exercise.rest_period_seconds && (
@@ -854,7 +863,7 @@ const WorkoutPlanDetail = () => {
                                                   )}
                                                 </div>
                                                 {exercise.notes && (
-                                                  <p className={`text-sm mt-1 ${isCompleted ? 'text-green-600' : 'text-gray-600'}`}>
+                                                  <p className={`text-sm mt-2 ${isCompleted ? 'text-emerald-600' : 'text-gray-600'} font-medium`}>
                                                     📝 {exercise.notes}
                                                   </p>
                                                 )}
@@ -863,7 +872,7 @@ const WorkoutPlanDetail = () => {
                                               {isCoach && coachInfo?.user_id === currentUserId && (
                                                 <button
                                                   onClick={() => handleDeleteExercise(exercise.id)}
-                                                  className="ml-2 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                                                  className="ml-2 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200 flex-shrink-0 hover:scale-110"
                                                 >
                                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
