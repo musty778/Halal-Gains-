@@ -323,7 +323,7 @@ const MealPlansNew = () => {
   // Client view
   if (!isCoach) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20">
         <div className="container mx-auto px-4 py-6">
           {/* Beautiful Gradient Title */}
           <div className="mb-8">

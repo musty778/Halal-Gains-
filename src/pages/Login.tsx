@@ -22,7 +22,7 @@ const Login = () => {
 
       if (authError) throw authError
 
-      navigate('/')
+      navigate('/dashboard')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred during login')
     } finally {
@@ -31,7 +31,7 @@ const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-primary-100 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-emerald-50 to-teal-50 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-6 sm:p-8">
           {/* Header */}

@@ -4,6 +4,7 @@ import { Layout } from './components'
 import { RamadanProvider } from './contexts/RamadanContext'
 
 // Lazy load all page components
+const LandingPage = lazy(() => import('./pages/LandingPage'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Coaches = lazy(() => import('./pages/Coaches'))
 const BrowseCoaches = lazy(() => import('./pages/BrowseCoaches'))
@@ -33,13 +34,13 @@ function App() {
       <Router>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/signup" element={<SignUp />} />
             <Route path="/login" element={<Login />} />
             <Route path="/*" element={
               <Layout>
                 <Suspense fallback={<LoadingFallback />}>
                   <Routes>
-                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/coaches" element={<Coaches />} />
                     <Route path="/browse-coaches" element={<BrowseCoaches />} />

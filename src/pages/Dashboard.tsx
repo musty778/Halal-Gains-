@@ -716,7 +716,7 @@ const Dashboard = () => {
   // Removed blocking loading screen for faster page transitions
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/30">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header with Greeting */}
         <div className="mb-8">

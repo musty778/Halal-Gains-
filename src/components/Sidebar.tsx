@@ -9,6 +9,7 @@ import {
   UtensilsCrossed,
   Dumbbell,
   TrendingUp,
+  MessageSquare,
   LogOut,
   Menu,
   X
@@ -110,6 +111,11 @@ const Sidebar = () => {
       label: 'Browse Coaches',
       icon: Search,
       clientOnly: true
+    },
+    {
+      path: '/chat',
+      label: 'Messages',
+      icon: MessageSquare
     },
     {
       path: '/meal-plans-new',

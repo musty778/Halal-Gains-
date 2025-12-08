@@ -190,7 +190,7 @@ const BrowseCoaches = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20">
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-8">
@@ -418,8 +418,10 @@ const BrowseCoaches = () => {
                           className="w-32 h-32 rounded-2xl object-cover border-4 border-white shadow-lg"
                         />
                       ) : (
-                        <div className="w-32 h-32 rounded-2xl bg-gray-100 border-4 border-white shadow-lg flex items-center justify-center text-4xl text-gray-300">
-                          👤
+                        <div className="w-32 h-32 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 border-4 border-white shadow-lg flex items-center justify-center">
+                          <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                          </svg>
                         </div>
                       )}
                     </div>

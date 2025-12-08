@@ -157,7 +157,7 @@ const CoachProfile = () => {
 
   if (!coach) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20 flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">😕</div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Coach not found</h2>
@@ -181,7 +181,7 @@ const CoachProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20">
       <div className="container mx-auto px-4 py-6">
         {/* Back Button */}
         <button
@@ -223,8 +223,10 @@ const CoachProfile = () => {
                     )}
                   </>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-6xl text-gray-300">
-                    👤
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400">
+                    <svg className="w-32 h-32 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
                   </div>
                 )}
               </div>

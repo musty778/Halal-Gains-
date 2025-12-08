@@ -50,6 +50,7 @@ const Chat = () => {
   const [assigning, setAssigning] = useState(false)
   const [currentClientUserId, setCurrentClientUserId] = useState<string | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -92,10 +93,20 @@ const Chat = () => {
       // Force a refresh to ensure UI updates
       setRefreshTrigger(prev => prev + 1)
 
-      alert('Success! You are now working with this client. They can now see you in their Coaches menu.')
+      // Show success notification
+      setNotification({
+        type: 'success',
+        message: 'Success! You are now working with this client. They can now see you in their Coaches menu.'
+      })
+      setTimeout(() => setNotification(null), 4000)
     } catch (err: any) {
       console.error('Error assigning coach:', err)
-      alert(`Failed to assign coach: ${err.message || 'Please try again.'}`)
+      // Show error notification
+      setNotification({
+        type: 'error',
+        message: `Failed to assign coach: ${err.message || 'Please try again.'}`
+      })
+      setTimeout(() => setNotification(null), 4000)
       setIsClientAssigned(false) // Reset on error
     } finally {
       setAssigning(false)
@@ -614,7 +625,7 @@ const Chat = () => {
   // Removed blocking loading screen for faster page transitions
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20">
       <div className="container mx-auto px-4 py-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Messages</h1>
 
