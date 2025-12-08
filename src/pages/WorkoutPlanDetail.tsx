@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface WorkoutPlan {
   id: string
@@ -573,7 +574,9 @@ const WorkoutPlanDetail = () => {
     setShowWeightModal(true)
   }
 
-  // Removed blocking loading screen for faster page transitions
+  if (loading) {
+    return <LoadingSpinner />
+  }
 
   if (!workoutPlan) {
     return null

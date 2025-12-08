@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { CoachSpecialisation, Gender, TrainingAvailabilityType } from '../types'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface CoachData {
   id: string
@@ -153,7 +154,9 @@ const CoachProfile = () => {
     fetchCoachData()
   }, [id])
 
-  // Removed blocking loading screen for faster page transitions
+  if (loading) {
+    return <LoadingSpinner />
+  }
 
   if (!coach) {
     return (

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface MealPlan {
   id: string
@@ -728,7 +729,9 @@ const MealPlanDetail = () => {
     }
   }
 
-  // Removed blocking loading screen for faster page transitions
+  if (loading) {
+    return <LoadingSpinner />
+  }
 
   if (!mealPlan) {
     return null

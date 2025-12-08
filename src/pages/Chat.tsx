@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../services/supabase'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface Message {
   id: string
@@ -622,7 +623,9 @@ const Chat = () => {
     }
   }
 
-  // Removed blocking loading screen for faster page transitions
+  if (loading) {
+    return <LoadingSpinner />
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20">

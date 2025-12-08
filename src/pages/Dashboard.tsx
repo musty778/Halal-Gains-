@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { Dumbbell, User, Calendar, Weight } from 'lucide-react'
+import LoadingSpinner from '../components/LoadingSpinner'
 
 interface WorkoutPlan {
   id: string
@@ -121,6 +122,9 @@ SessionPill.displayName = 'SessionPill'
 const Dashboard = () => {
   const navigate = useNavigate()
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [isCoach, setIsCoach] = useState(false)
+  const [coachProfileId, setCoachProfileId] = useState<string | null>(null)
+  const [userName, setUserName] = useState<string>('')
   const [clientName, setClientName] = useState<string>('')
   const [workoutPlan, setWorkoutPlan] = useState<WorkoutPlan | null>(null)
   const [weekWorkouts, setWeekWorkouts] = useState<WorkoutDay[]>([])
@@ -134,6 +138,11 @@ const Dashboard = () => {
   const [mealPlan, setMealPlan] = useState<MealPlan | null>(null)
   const [weekMealPlanDays, setWeekMealPlanDays] = useState<MealPlanDay[]>([])
   const [togglingMealDay, setTogglingMealDay] = useState<string | null>(null)
+
+  // Coach-specific stats
+  const [totalClients, setTotalClients] = useState<number>(0)
+  const [totalWorkoutPlans, setTotalWorkoutPlans] = useState<number>(0)
+  const [totalMealPlans, setTotalMealPlans] = useState<number>(0)
 
   useEffect(() => {
     const checkUser = async () => {
@@ -150,6 +159,20 @@ const Dashboard = () => {
 
       setCurrentUserId(user.id)
 
+      // Check if user is a coach
+      const { data: coachData } = await supabase
+        .from('coach_profiles')
+        .select('id, full_name')
+        .eq('user_id', user.id)
+        .single()
+
+      if (coachData) {
+        setIsCoach(true)
+        setCoachProfileId(coachData.id)
+        setUserName(coachData.full_name)
+        return // Coach dashboard doesn't need client data
+      }
+
       // Get client profile
       const { data: profile, error: profileError } = await supabase
         .from('client_profiles')
@@ -163,6 +186,7 @@ const Dashboard = () => {
 
       if (profile) {
         setClientName(profile.full_name)
+        setUserName(profile.full_name)
       }
     }
 
@@ -453,13 +477,56 @@ const Dashboard = () => {
     }
   }, [currentUserId])
 
+  // Fetch coach stats
+  const fetchCoachStats = useCallback(async () => {
+    if (!coachProfileId) return
+
+    try {
+      // Get unique clients from conversations
+      const { data: conversations } = await supabase
+        .from('conversations')
+        .select('client_id')
+        .eq('coach_id', coachProfileId)
+
+      const uniqueClientIds = conversations
+        ? [...new Set(conversations.map(c => c.client_id))]
+        : []
+      setTotalClients(uniqueClientIds.length)
+
+      // Get total workout plans
+      const { count: workoutCount } = await supabase
+        .from('workout_plans')
+        .select('*', { count: 'exact', head: true })
+        .eq('coach_id', coachProfileId)
+
+      setTotalWorkoutPlans(workoutCount || 0)
+
+      // Get total meal plans
+      const { count: mealCount } = await supabase
+        .from('meal_plans')
+        .select('*', { count: 'exact', head: true })
+        .eq('coach_id', coachProfileId)
+
+      setTotalMealPlans(mealCount || 0)
+
+      setLoading(false)
+    } catch (error) {
+      console.error('Error fetching coach stats:', error)
+      setLoading(false)
+    }
+  }, [coachProfileId])
+
   useEffect(() => {
-    if (currentUserId) {
+    if (isCoach && coachProfileId) {
+      // Coach dashboard
+      fetchCoachStats()
+    } else if (currentUserId && !isCoach) {
+      // Client dashboard
       fetchWorkoutPlan()
       fetchDashboardStats()
       fetchMealPlan()
     }
-  }, [currentUserId, fetchWorkoutPlan, fetchDashboardStats, fetchMealPlan])
+  }, [currentUserId, isCoach, coachProfileId, fetchWorkoutPlan, fetchDashboardStats, fetchMealPlan, fetchCoachStats])
 
   const handleToggleExercise = useCallback(async (exerciseId: string, currentlyCompleted: boolean) => {
     if (!currentUserId || togglingExercise || weekWorkouts.length === 0) return
@@ -713,8 +780,170 @@ const Dashboard = () => {
     }
   }, [currentUserId, weekMealPlanDays, fetchMealPlan, togglingMealDay])
 
-  // Removed blocking loading screen for faster page transitions
+  if (loading) {
+    return <LoadingSpinner />
+  }
 
+  // Coach Dashboard
+  if (isCoach) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20">
+        <div className="container mx-auto px-4 py-8 max-w-7xl">
+          {/* Header with Greeting */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent mb-2">
+              Salamu Alaykum, Coach {userName}!
+            </h1>
+            <p className="text-gray-600 text-lg">
+              Empower your clients to achieve their fitness goals.
+            </p>
+          </div>
+
+          {/* Coach Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+            <StatCard
+              title="Total Clients"
+              value={totalClients}
+              gradient="from-emerald-500 to-teal-600"
+              accentColor="bg-gradient-to-br from-emerald-400 to-teal-500"
+              icon={<User className="w-6 h-6 text-white" />}
+            />
+            <StatCard
+              title="Workout Plans"
+              value={totalWorkoutPlans}
+              gradient="from-blue-500 to-cyan-600"
+              accentColor="bg-gradient-to-br from-blue-400 to-cyan-500"
+              icon={<Dumbbell className="w-6 h-6 text-white" />}
+            />
+            <StatCard
+              title="Meal Plans"
+              value={totalMealPlans}
+              gradient="from-purple-500 to-pink-600"
+              accentColor="bg-gradient-to-br from-purple-400 to-pink-500"
+              icon={<Calendar className="w-6 h-6 text-white" />}
+            />
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Workout Plans Card */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-400 to-teal-400 rounded-2xl opacity-0 group-hover:opacity-10 blur transition duration-300"></div>
+              <div className="relative bg-white/60 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <Dumbbell className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Workout Plans</h3>
+                  </div>
+                </div>
+                <p className="text-gray-600 mb-4">
+                  Create and manage workout plans for your clients
+                </p>
+                <button
+                  onClick={() => navigate('/workout-plans')}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full font-semibold hover:shadow-lg hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <span>Manage Plans</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Meal Plans Card */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-400 to-pink-400 rounded-2xl opacity-0 group-hover:opacity-10 blur transition duration-300"></div>
+              <div className="relative bg-white/60 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-pink-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Meal Plans</h3>
+                  </div>
+                </div>
+                <p className="text-gray-600 mb-4">
+                  Create and manage meal plans for your clients
+                </p>
+                <button
+                  onClick={() => navigate('/meal-plans')}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-semibold hover:shadow-lg hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <span>Manage Plans</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Chat Card */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-400 to-cyan-400 rounded-2xl opacity-0 group-hover:opacity-10 blur transition duration-300"></div>
+              <div className="relative bg-white/60 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">Messages</h3>
+                  </div>
+                </div>
+                <p className="text-gray-600 mb-4">
+                  Chat with your clients and answer their questions
+                </p>
+                <button
+                  onClick={() => navigate('/chat')}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full font-semibold hover:shadow-lg hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <span>View Messages</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Browse Clients Card */}
+            <div className="group relative">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-400 to-amber-400 rounded-2xl opacity-0 group-hover:opacity-10 blur transition duration-300"></div>
+              <div className="relative bg-white/60 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-orange-400 to-amber-500 rounded-xl flex items-center justify-center shadow-lg">
+                      <User className="w-6 h-6 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">My Clients</h3>
+                  </div>
+                </div>
+                <p className="text-gray-600 mb-4">
+                  View and manage your client relationships
+                </p>
+                <button
+                  onClick={() => navigate('/chat')}
+                  className="w-full px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-full font-semibold hover:shadow-lg hover:scale-[1.02] transition-all duration-300 flex items-center justify-center gap-2"
+                >
+                  <span>View Clients</span>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Client Dashboard
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/20 to-cyan-50/20">
       <div className="container mx-auto px-4 py-8 max-w-7xl">

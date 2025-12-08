@@ -83,10 +83,22 @@ const WorkoutPlans = () => {
       setWorkoutPlans([])
       setLoading(true)
 
-      const { data, error } = await supabase
+      // Build query based on user type
+      let query = supabase
         .from('workout_plans')
         .select('*')
         .order('created_at', { ascending: false })
+
+      // Filter by user type
+      if (isCoach && coachProfileId) {
+        // Coaches see their own workout plans
+        query = query.eq('coach_id', coachProfileId)
+      } else if (!isCoach) {
+        // Clients see only their assigned workout plans
+        query = query.eq('client_id', currentUserId)
+      }
+
+      const { data, error } = await query
 
       if (!error && data) {
         // Get all unique client IDs
@@ -168,7 +180,10 @@ const WorkoutPlans = () => {
       setLoading(false)
     }
 
-    fetchWorkoutPlans()
+    // Only fetch when we know the user type
+    if (currentUserId && (isCoach ? coachProfileId : true)) {
+      fetchWorkoutPlans()
+    }
   }, [currentUserId, coachProfileId, isCoach])
 
   // Fetch clients (from conversations)
@@ -471,7 +486,7 @@ const WorkoutPlans = () => {
           <h1 className="text-2xl font-bold text-gray-900">🏋️ Workout Plans</h1>
           <button
             onClick={openCreateModal}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full font-semibold hover:shadow-lg hover:scale-[1.02] transition-all duration-300"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -489,7 +504,7 @@ const WorkoutPlans = () => {
             </p>
             <button
               onClick={openCreateModal}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-full font-semibold hover:shadow-lg hover:scale-[1.02] transition-all duration-300"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -498,7 +513,7 @@ const WorkoutPlans = () => {
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {workoutPlans.map((plan) => {
               const goalInfo = getGoalInfo(plan.goal)
               const difficultyInfo = getDifficultyInfo(plan.difficulty)
@@ -506,21 +521,25 @@ const WorkoutPlans = () => {
               return (
                 <div
                   key={plan.id}
-                  onClick={() => navigate(`/workout-plan/${plan.id}`)}
-                  className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer"
+                  className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden hover:shadow-3xl transition-all duration-300 cursor-pointer group relative"
+                  style={{ boxShadow: '0 20px 40px -10px rgba(0, 0, 0, 0.15)' }}
                 >
-                  <div className="flex items-start justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900 flex-1 pr-2">{plan.name}</h3>
-                    <div className="flex items-center gap-1">
+                  {/* Gradient Header - Larger */}
+                  <div className="relative h-56 bg-gradient-to-br from-emerald-400 via-teal-400 to-cyan-400 overflow-hidden">
+                    {/* Glassy overlay */}
+                    <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
+
+                    {/* Edit and Delete buttons in top right */}
+                    <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           openEditModal(plan)
                         }}
-                        className="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                        className="p-2.5 text-white hover:bg-white/20 rounded-lg transition-colors backdrop-blur-sm"
                         title="Edit plan"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                         </svg>
                       </button>
@@ -530,13 +549,13 @@ const WorkoutPlans = () => {
                           handleDelete(plan.id)
                         }}
                         disabled={deleting === plan.id}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-2.5 text-white hover:bg-white/20 rounded-lg transition-colors disabled:opacity-50 backdrop-blur-sm"
                         title="Delete plan"
                       >
                         {deleting === plan.id ? (
-                          <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         ) : (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         )}
@@ -544,24 +563,45 @@ const WorkoutPlans = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <span>⏱️</span>
-                      <span>{plan.duration}</span>
+                  {/* Card Content */}
+                  <div className="px-8 pb-8 -mt-16 relative">
+                    {/* Icon Circle - Larger and overlapping the gradient */}
+                    <div className="flex justify-center mb-6">
+                      <div className="w-28 h-28 rounded-3xl bg-white border-4 border-white shadow-2xl flex items-center justify-center text-5xl relative z-10">
+                        💪
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 text-gray-600">
-                      <span>{goalInfo.emoji}</span>
-                      <span>{goalInfo.label}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${difficultyInfo.color}`}>
-                        {difficultyInfo.emoji} {difficultyInfo.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-gray-600 pt-2 border-t border-gray-100 mt-2">
-                      {plan.client_id ? (
-                        <>
-                          <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+
+                    {/* Plan Name - Larger */}
+                    <h3 className="text-2xl font-bold text-gray-900 text-center mb-2 group-hover:text-emerald-600 transition-colors">
+                      {plan.name}
+                    </h3>
+
+                    {/* Duration */}
+                    <p className="text-gray-500 text-center mb-6 text-sm">
+                      {plan.duration}
+                    </p>
+
+                    {/* Plan Details - Larger spacing */}
+                    <div className="space-y-4 mb-6">
+                      {/* Goal */}
+                      <div className="flex items-center justify-center gap-3 text-gray-800">
+                        <span className="text-2xl">{goalInfo.emoji}</span>
+                        <span className="font-bold text-lg">{goalInfo.label}</span>
+                      </div>
+
+                      {/* Difficulty - with background pill */}
+                      <div className="flex justify-center">
+                        <div className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full ${difficultyInfo.color}`}>
+                          <span className="text-xl">{difficultyInfo.emoji}</span>
+                          <span className="font-bold">{difficultyInfo.label}</span>
+                        </div>
+                      </div>
+
+                      {/* Client Assignment */}
+                      {plan.client_id && (
+                        <div className="flex items-center justify-center gap-2 text-gray-700 pt-2">
+                          <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
                             {plan.client_photo ? (
                               <img
                                 src={plan.client_photo}
@@ -569,18 +609,21 @@ const WorkoutPlans = () => {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <span className="text-xs">👤</span>
+                              <span className="text-sm">👤</span>
                             )}
                           </div>
-                          <span className="text-gray-900 truncate">{plan.client_name}</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>👤</span>
-                          <span className="text-gray-400 italic">Not assigned</span>
-                        </>
+                          <span className="text-gray-900 font-semibold">{plan.client_name}</span>
+                        </div>
                       )}
                     </div>
+
+                    {/* View Button - Larger */}
+                    <button
+                      onClick={() => navigate(`/workout-plan/${plan.id}`)}
+                      className="w-full py-4 px-6 bg-gray-900 text-white rounded-2xl font-bold hover:bg-gray-800 transition-all text-lg shadow-lg hover:shadow-xl group-hover:scale-[1.02] transform duration-300"
+                    >
+                      View Plan
+                    </button>
                   </div>
                 </div>
               )
