@@ -558,10 +558,9 @@ const Progress = () => {
 
     const weights = sortedWeights.map(w => w.weight_kg)
 
-    // Calculate min and max for better Y-axis scaling
-    const minWeight = Math.min(...weights)
-    const maxWeight = Math.max(...weights)
-    const padding = (maxWeight - minWeight) * 0.1 || 5 // 10% padding or 5kg minimum
+    // Calculate min and max for better Y-axis scaling (available for future customization)
+    // const minWeight = Math.min(...weights)
+    // const maxWeight = Math.max(...weights)
 
     return {
       labels,
@@ -638,13 +637,11 @@ const Progress = () => {
       y: {
         beginAtZero: false,
         grid: {
-          color: 'rgba(0, 0, 0, 0.05)',
-          drawBorder: false
+          color: 'rgba(0, 0, 0, 0.05)'
         },
         ticks: {
           font: {
-            size: 12,
-            weight: '500' as const
+            size: 12
           },
           color: '#6B7280',
           callback: function(value: any) {
@@ -654,13 +651,11 @@ const Progress = () => {
       },
       x: {
         grid: {
-          display: false,
-          drawBorder: false
+          display: false
         },
         ticks: {
           font: {
-            size: 11,
-            weight: '500' as const
+            size: 11
           },
           color: '#6B7280',
           maxRotation: 45,
@@ -678,7 +673,7 @@ const Progress = () => {
       intersect: false,
       mode: 'index' as const
     }
-  }), [weightTracking])
+  } as const), [weightTracking])
 
   // Show beautiful loading indicator while fetching to prevent flash of old content
   if (loading) {

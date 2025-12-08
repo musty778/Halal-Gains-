@@ -241,13 +241,14 @@ const MealPlanDetail = () => {
     const mealIds = mealsResult.data?.map(m => m.id) || []
 
     // Fetch foods if there are meals
-    let foodsResult = { data: [] as any[] }
+    let foodsData: any[] | null = []
     if (mealIds.length > 0) {
-      foodsResult = await supabase
+      const { data } = await supabase
         .from('meal_plan_foods')
         .select('*')
         .in('meal_plan_meal_id', mealIds)
         .order('food_order', { ascending: true })
+      foodsData = data
     }
 
     const daysResult = { data: days }
@@ -263,7 +264,7 @@ const MealPlanDetail = () => {
       })
 
       const foodsMap = new Map<string, any[]>()
-      foodsResult.data?.forEach(food => {
+      foodsData?.forEach(food => {
         if (!foodsMap.has(food.meal_plan_meal_id)) {
           foodsMap.set(food.meal_plan_meal_id, [])
         }
@@ -653,7 +654,7 @@ const MealPlanDetail = () => {
       }
 
       // Call the database function to record weight
-      const { data, error } = await supabase.rpc('record_meal_plan_weekly_weight', {
+      const { error } = await supabase.rpc('record_meal_plan_weekly_weight', {
         p_meal_plan_id: id,
         p_week_number: selectedWeekForWeight.weekNumber,
         p_weight_kg: parseFloat(currentWeight)

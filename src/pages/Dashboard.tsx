@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import { useState, useEffect, useCallback, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../services/supabase'
 import { Dumbbell, User, Calendar, Weight } from 'lucide-react'
@@ -134,8 +134,8 @@ const Dashboard = () => {
   const [workoutsCompleted, setWorkoutsCompleted] = useState<number>(0)
   const [coachName, setCoachName] = useState<string | null>(null)
   const [togglingExercise, setTogglingExercise] = useState<string | null>(null)
-  const [togglingWorkoutDay, setTogglingWorkoutDay] = useState<boolean>(false)
-  const [mealPlan, setMealPlan] = useState<MealPlan | null>(null)
+  // const [togglingWorkoutDay, setTogglingWorkoutDay] = useState<boolean>(false) // Temporarily unused
+  const [_mealPlan, setMealPlan] = useState<MealPlan | null>(null)
   const [weekMealPlanDays, setWeekMealPlanDays] = useState<MealPlanDay[]>([])
   const [togglingMealDay, setTogglingMealDay] = useState<string | null>(null)
 
@@ -634,38 +634,27 @@ const Dashboard = () => {
     }
   }, [currentUserId, weekWorkouts, todayWorkout, fetchWorkoutPlan, fetchDashboardStats, togglingExercise])
 
-  // Memoize exercise completion status map
-  const exerciseCompletionMap = useMemo(() => {
-    const map = new Map<string, boolean>()
-    if (todayWorkout?.completion) {
-      todayWorkout.completion.exercise_completions.forEach(ec => {
-        map.set(ec.workout_exercise_id, ec.completed)
-      })
-    }
-    return map
-  }, [todayWorkout?.completion])
-
-  const isExerciseCompleted = useCallback((exerciseId: string): boolean => {
-    return exerciseCompletionMap.get(exerciseId) || false
-  }, [exerciseCompletionMap])
-
   // Check if all exercises are completed
-  const isWorkoutDayCompleted = useMemo(() => {
-    if (!todayWorkout || !todayWorkout.exercises || todayWorkout.exercises.length === 0) {
-      return false
-    }
-    return todayWorkout.exercises.every(exercise => isExerciseCompleted(exercise.id))
-  }, [todayWorkout, isExerciseCompleted])
+  // Temporarily disabled - can be re-enabled when needed
+  // const isWorkoutDayCompleted = useMemo(() => {
+  //   if (!todayWorkout || !todayWorkout.exercises || todayWorkout.exercises.length === 0) {
+  //     return false
+  //   }
+  //   return todayWorkout.exercises.every(exercise => isExerciseCompleted(exercise.id))
+  // }, [todayWorkout, isExerciseCompleted])
 
   // Get session status for pill
-  const getSessionStatus = (): 'completed' | 'pending' | 'rest' => {
-    if (!todayWorkout) return 'rest'
-    if (todayWorkout.workout_type === 'rest') return 'rest'
-    if (isWorkoutDayCompleted) return 'completed'
-    return 'pending'
-  }
+  // Temporarily disabled - can be re-enabled when needed
+  // const getSessionStatus = (): 'completed' | 'pending' | 'rest' => {
+  //   if (!todayWorkout) return 'rest'
+  //   if (todayWorkout.workout_type === 'rest') return 'rest'
+  //   if (isWorkoutDayCompleted) return 'completed'
+  //   return 'pending'
+  // }
 
   // Handler to mark all exercises as complete/incomplete
+  // Temporarily disabled - can be re-enabled when needed
+  /* Commented out to fix build errors - can be re-enabled when needed
   const handleToggleWorkoutDay = useCallback(async () => {
     if (!currentUserId || !todayWorkout || togglingWorkoutDay || !todayWorkout.exercises || todayWorkout.exercises.length === 0) return
 
@@ -744,6 +733,7 @@ const Dashboard = () => {
       setTogglingWorkoutDay(false)
     }
   }, [currentUserId, todayWorkout, isWorkoutDayCompleted, fetchWorkoutPlan, fetchDashboardStats, togglingWorkoutDay])
+  */
 
   const handleToggleMealDay = useCallback(async (dayId: string, currentlyCompleted: boolean) => {
     if (!currentUserId || togglingMealDay) return
@@ -1178,9 +1168,6 @@ const Dashboard = () => {
                         .map((workout) => {
                         const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
                         const isToday = workout.day_of_week === new Date().getDay()
-                        const workoutCompleted = workout.exercises.every(ex =>
-                          workout.completion?.exercise_completions.find(ec => ec.workout_exercise_id === ex.id)?.completed
-                        )
 
                         return (
                           <div key={workout.id} className={`${isToday ? 'ring-2 ring-blue-400' : ''} rounded-xl`}>

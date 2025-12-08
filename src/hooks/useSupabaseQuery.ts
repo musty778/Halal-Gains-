@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '../services/supabase'
 
 interface UseSupabaseQueryOptions<T> {
   queryFn: () => Promise<{ data: T | null; error: any }>

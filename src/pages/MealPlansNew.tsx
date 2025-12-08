@@ -130,11 +130,16 @@ const MealPlansNew = () => {
 
             const [clientResult, completionsResult] = await Promise.all(promises)
 
+            const clientData = clientResult.data && !Array.isArray(clientResult.data) 
+              ? clientResult.data as { full_name?: string; profile_photo?: string }
+              : null
+            const completionsData = completionsResult.data as any[] | null
+
             return {
               ...plan,
-              client_name: clientResult.data?.full_name || (plan.client_id ? 'Unknown Client' : undefined),
-              client_photo: clientResult.data?.profile_photo,
-              has_completions: completionsResult.data && completionsResult.data.length > 0
+              client_name: clientData?.full_name || (plan.client_id ? 'Unknown Client' : undefined),
+              client_photo: clientData?.profile_photo,
+              has_completions: completionsData && completionsData.length > 0
             }
           })
         )

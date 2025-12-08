@@ -51,7 +51,7 @@ const Chat = () => {
   const [assigning, setAssigning] = useState(false)
   const [currentClientUserId, setCurrentClientUserId] = useState<string | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
-  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [_notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
